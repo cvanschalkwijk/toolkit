@@ -46,5 +46,5 @@ export const sanitizeTextTool = defineTool({
       duration_ms: z.number().int(),
     })
     .openapi('SanitizeTextOutput'),
-  execute: async (input) => pyJson('/sanitize', input, { timeoutMs: 60_000 }),
+  execute: async (input) => pyJson('/sanitize/text', input, { timeoutMs: 60_000 }),
 })
