@@ -38,6 +38,32 @@ Extract structured data from unstructured text by giving it a JSON Schema.
 
 Not yet supported: `$ref`, `definitions`, `pattern`, JSON Schema Draft 2020-12 specific features.
 
+### Prefer flat schemas
+
+**Strong recommendation: keep schemas flat.** Put every field at the top level of the object. Use prefixed keys (`person_name`, `company_name`) instead of nested objects (`{person: {name}, company: {name}}`).
+
+Why this matters for this tool specifically:
+
+- **Small / mid-size models** (7–13B) reliably produce flat JSON but lose accuracy rapidly as nesting depth grows. 3-level schemas often fail on anything smaller than 70B or a frontier hosted model.
+- **`max_retries` isn't a rescue.** If the model can't produce the shape, three tries won't help — it'll just waste tokens and time.
+- **Flat schemas arrive faster.** Fewer output tokens = lower latency and less chance the model derails mid-generation.
+- **Cloud models handle nesting fine** (GPT-4o, Claude Sonnet, Gemini Pro) but still benefit from flat structures for speed and cost.
+
+Nesting that DOES tend to work well: **one level**, used sparingly — e.g., `{field_name: {type, value}}`. Avoid nesting objects inside arrays of objects when the model is local and under ~13B.
+
+If you need a hierarchical output shape, two safer patterns:
+
+1. Call `extract_structured` twice with flat schemas, one per subtree, and assemble client-side.
+2. Flatten during extraction, then reshape client-side with `jq` or similar:
+
+```bash
+# Extract flat
+RESP=$(curl -sS -X POST http://localhost:3000/extract/structured -d '{"text":"...", "schema": {...flat...}}')
+
+# Reshape to nested
+echo "$RESP" | jq '.data | {person: {name: .person_name, role: .person_role}, company: {name: .company_name, year: .company_year}}'
+```
+
 ## Output
 
 ```json
@@ -57,7 +83,7 @@ Not yet supported: `$ref`, `definitions`, `pattern`, JSON Schema Draft 2020-12 s
 
 ## Examples
 
-### HTTP — extract a person's bio
+### HTTP — flat bio extraction (recommended shape)
 
 ```bash
 curl -sS -X POST http://localhost:3000/extract/structured \
@@ -78,7 +104,7 @@ curl -sS -X POST http://localhost:3000/extract/structured \
   }' | jq '.data'
 ```
 
-Example output:
+Expected:
 
 ```json
 {
@@ -108,11 +134,37 @@ curl -sS -X POST http://localhost:3000/extract/structured \
   }' | jq '.data'
 ```
 
+### HTTP — multi-entity flat extraction (prefix-keyed, not nested)
+
+This is the flat pattern that replaces "a person and a company and their education":
+
+```bash
+curl -sS -X POST http://localhost:3000/extract/structured \
+  -H 'content-type: application/json' \
+  -d '{
+    "text": "Jensen Huang is the co-founder and CEO of NVIDIA. Born in 1963 in Taiwan, he studied electrical engineering at Oregon State and Stanford. He founded NVIDIA in 1993. The company is headquartered in Santa Clara, California, and went public on the Nasdaq in 1999.",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "person_name":         { "type": "string" },
+        "person_birth_year":   { "type": "integer" },
+        "person_role":         { "type": "string" },
+        "company_name":        { "type": "string" },
+        "company_founded_year":{ "type": "integer" },
+        "company_hq":          { "type": "string" },
+        "listing_exchange":    { "type": "string", "enum": ["Nasdaq", "NYSE", "AMEX", "OTC"] },
+        "schools":             { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["person_name", "company_name"]
+    }
+  }' | jq '.data'
+```
+
 ### MCP — agent-driven extraction
 
-> *Use `extract_structured` to pull a list of action items from these meeting notes into `{owner, due_date, task}[]`.*
+> *Use `extract_structured` to pull a list of action items from these meeting notes. Use a flat schema: `owner`, `task`, `due_date`, one object per action item in an array.*
 
-The agent calls the tool with the notes as `text` and the schema as an array of objects, then operates on the structured result.
+The agent calls the tool, gets back `data.action_items` (or whatever you named the array), and iterates.
 
 ## Notes & caveats
 

@@ -5,7 +5,9 @@ import { defineTool } from '../../lib/tool'
 export const extractStructuredTool = defineTool({
   name: 'extract_structured',
   description:
-    'Extract structured data from unstructured text by giving it a JSON Schema. Uses Instructor + any OpenAI-compatible LLM endpoint to generate output matching the schema, with automatic retries if the LLM produces invalid JSON. Requires LLM_BASE_URL + LLM_API_KEY env on the sidecar; returns 501 otherwise. See docs/tools/extract-structured.md.',
+    'Extract structured data from unstructured text by giving it a JSON Schema. Uses Instructor + any OpenAI-compatible LLM endpoint to generate output matching the schema, with automatic retries if the LLM produces invalid JSON. ' +
+    'BEST PRACTICE: use a FLAT schema — all fields at the top level, prefixed keys (person_name, company_name) instead of nested objects. Small/mid-size models (< 70B) reliably produce flat JSON but often fail on nested objects or arrays-of-objects. Reshape into nested form client-side if needed. ' +
+    'Requires LLM_BASE_URL + LLM_API_KEY env on the sidecar; returns 501 otherwise. Full contract: docs/tools/extract-structured.md.',
   category: 'extract',
   http: { method: 'post', path: '/extract/structured' },
   input: z
