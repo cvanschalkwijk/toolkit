@@ -91,10 +91,18 @@ COPY apps/py/src/ ./src/
 # docker volume mounts onto /home/app/.cache, it inherits these perms on
 # first init — otherwise docker creates the mount point as root:root and the
 # app user can't write.
+#
+# Also chown the rapidocr package dir: docling's OCR path downloads extra
+# ONNX weights into rapidocr/models/ on first use, and that path defaults
+# to the (root-owned) site-packages location. Without write access there,
+# any PDF conversion that triggers OCR 500s with a PermissionError.
 RUN groupadd --gid 1000 app \
  && useradd --uid 1000 --gid 1000 --shell /bin/sh -m -d /home/app app \
  && mkdir -p /home/app/.cache/huggingface /home/app/.cache/sentence-transformers \
- && chown -R app:app /app /home/app
+ && chown -R app:app /app /home/app \
+ && ( [ -d /usr/local/lib/python3.12/site-packages/rapidocr ] \
+      && chown -R app:app /usr/local/lib/python3.12/site-packages/rapidocr \
+      || true )
 USER app
 
 # Point the HF / transformers caches at a known writable directory so the
