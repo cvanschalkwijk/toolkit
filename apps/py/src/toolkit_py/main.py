@@ -15,7 +15,6 @@ categories surface as HTTP 501 with a clear "install extras" message.
 from __future__ import annotations
 
 import asyncio
-import importlib
 from typing import Annotated, Any, Literal
 
 from fastapi import FastAPI, File, Form, UploadFile
@@ -37,13 +36,18 @@ app = FastAPI(
 # --- Health ------------------------------------------------------------------
 
 
-def _probe(module_suffix: str) -> str:
-    """Tell whether a category's optional deps are installed without loading them."""
-    try:
-        importlib.import_module(f"toolkit_py.{module_suffix}")
+def _probe(required: list[str]) -> str:
+    """
+    Report a category as `ready` only when every required engine library is
+    importable. Uses find_spec so we don't pay the import cost on every
+    health check.
+    """
+    from importlib.util import find_spec
+
+    missing = [name for name in required if find_spec(name) is None]
+    if not missing:
         return "ready"
-    except ImportError:
-        return "not_installed"
+    return f"not_installed (missing: {', '.join(missing)})"
 
 
 @app.get("/health")
@@ -52,10 +56,10 @@ async def health() -> dict:
         "status": "ok",
         "version": __version__,
         "categories": {
-            "convert": _probe("convert.engines"),
-            "chunk": _probe("chunk.semantic"),
-            "sanitize": _probe("sanitize.presidio_runner"),
-            "extract": _probe("extract.instructor_runner"),
+            "convert": _probe(["markitdown", "docling"]),
+            "chunk": _probe(["sentence_transformers", "langchain_experimental", "torch"]),
+            "sanitize": _probe(["presidio_analyzer", "presidio_anonymizer", "spacy"]),
+            "extract": _probe(["instructor", "openai"]),
         },
     }
 
