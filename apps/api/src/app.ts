@@ -5,6 +5,9 @@
 
 import { swaggerUI } from '@hono/swagger-ui'
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
+import { mountHttp } from './adapters/http'
+import { mountMcp } from './adapters/mcp'
+import { tools } from './tools/registry'
 
 const app = new OpenAPIHono()
 
@@ -47,5 +50,9 @@ app.doc('/openapi.json', {
 })
 
 app.get('/', swaggerUI({ url: '/openapi.json' }))
+
+// --- Tools: mount on both HTTP and MCP surfaces ---
+mountHttp(app, tools)
+mountMcp(app, tools)
 
 export default app

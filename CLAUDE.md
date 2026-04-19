@@ -54,7 +54,8 @@ never call Bun from Python.
 
 ## What doesn't go here
 
-- Hostnames (`util.scrannr.com`, `localhost:3000` in docs only as examples).
+- Hostnames. Use `localhost:3000` or `<your-host>` in docs; don't bake a
+  specific deployment's domain into the repo.
 - Operator infra (Caddyfiles, Cloudflare tokens, SSH keys). That lives in
   the operator's own infra repo; this repo only publishes Docker images and
   a generic `docker-compose.yml`.

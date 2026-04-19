@@ -1,0 +1,1 @@
+export { pingTool } from './ping'

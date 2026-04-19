@@ -79,7 +79,10 @@ Both the HTTP route and the MCP tool appear automatically on next start.
 
 ## Deployment
 
-For a worked example (Caddy + Tailscale + Cloudflare DNS-01 + bitdream host), see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). Any HTTPS reverse proxy that can route to the Bun container works; the repo itself is hostname-agnostic.
+The repo is hostname-agnostic: any HTTPS reverse proxy that can route to
+the `api` container works. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+for a worked example (Caddy + Tailscale + Cloudflare DNS-01); Traefik,
+Nginx, a Cloudflare Tunnel, or `ngrok` all work equally well.
 
 ## License
 

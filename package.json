@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "bun --cwd apps/api run dev",
     "test": "bun test apps/api",
-    "typecheck": "bun --cwd apps/api run typecheck",
+    "typecheck": "cd apps/api && bun run typecheck",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",

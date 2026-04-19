@@ -6,9 +6,22 @@ const schema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   PY_URL: z.string().url().default('http://py:8000'),
   // LLM backend only required by the extract_structured tool; empty is OK.
-  LLM_BASE_URL: z.string().url().optional().or(z.literal('')).transform((v) => v || undefined),
-  LLM_API_KEY: z.string().optional().or(z.literal('')).transform((v) => v || undefined),
-  LLM_DEFAULT_MODEL: z.string().optional().or(z.literal('')).transform((v) => v || undefined),
+  LLM_BASE_URL: z
+    .string()
+    .url()
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => v || undefined),
+  LLM_API_KEY: z
+    .string()
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => v || undefined),
+  LLM_DEFAULT_MODEL: z
+    .string()
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => v || undefined),
 })
 
 export type Env = z.infer<typeof schema>
