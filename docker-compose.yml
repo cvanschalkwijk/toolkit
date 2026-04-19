@@ -17,10 +17,9 @@ services:
       - API_HOST=0.0.0.0
       - API_PORT=3000
       - PY_URL=http://py:8000
-      - LLM_BASE_URL=${LLM_BASE_URL:-}
-      - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_DEFAULT_MODEL=${LLM_DEFAULT_MODEL:-}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      # NOTE: LLM_* env vars live on `py` below, not here — the extract
+      # tool's LLM call path runs inside the Python sidecar.
     depends_on:
       py:
         condition: service_healthy
@@ -37,6 +36,13 @@ services:
     image: ghcr.io/cvanschalkwijk/toolkit/py:${IMAGE_TAG:-latest}
     container_name: toolkit-py
     restart: unless-stopped
+    environment:
+      # extract_structured runs LLM calls inside the Python sidecar (not the
+      # Bun api). The sidecar is the one that needs these; the api doesn't
+      # use them directly.
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_DEFAULT_MODEL=${LLM_DEFAULT_MODEL:-}
     networks:
       - toolkit-net
     volumes:
