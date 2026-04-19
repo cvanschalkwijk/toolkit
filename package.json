@@ -1,0 +1,20 @@
+{
+  "name": "toolkit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HTTP + MCP utility API for LLM-efficient document tooling",
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "bun --cwd apps/api run dev",
+    "test": "bun test apps/api",
+    "typecheck": "bun --cwd apps/api run typecheck",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "validate": "bun run typecheck && bun run lint && bun run test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "latest"
+  }
+}

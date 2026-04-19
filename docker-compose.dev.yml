@@ -1,0 +1,19 @@
+# toolkit — dev stack
+#
+# Runs ONLY the Python sidecar. Bun API runs on the host via `bun run dev`
+# so file edits hot-reload. Host exposure is bound to loopback so nothing
+# leaks past the dev machine.
+
+name: toolkit-dev
+
+services:
+  py:
+    build:
+      context: ./apps/py
+      dockerfile: Dockerfile
+    container_name: toolkit-dev-py
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./apps/py/src:/app/src:ro

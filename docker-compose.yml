@@ -1,0 +1,51 @@
+# toolkit — prod stack
+#
+# Two services on an internal network. Neither publishes host ports; your
+# reverse proxy reaches `api:3000` on the `toolkit-net` network.
+#
+# To route from a separate proxy (e.g. Caddy in another compose file),
+# declare `toolkit_toolkit-net` as an external network on that proxy.
+
+name: toolkit
+
+services:
+  api:
+    image: ghcr.io/cvanschalkwijk/toolkit/api:${IMAGE_TAG:-latest}
+    container_name: toolkit-api
+    restart: unless-stopped
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=3000
+      - PY_URL=http://py:8000
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_DEFAULT_MODEL=${LLM_DEFAULT_MODEL:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      py:
+        condition: service_healthy
+    networks:
+      - toolkit-net
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/health').then(r => r.ok ? 0 : process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  py:
+    image: ghcr.io/cvanschalkwijk/toolkit/py:${IMAGE_TAG:-latest}
+    container_name: toolkit-py
+    restart: unless-stopped
+    networks:
+      - toolkit-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+networks:
+  toolkit-net:
+    name: toolkit-net
