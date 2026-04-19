@@ -1,9 +1,9 @@
 name: Release
 
 # Build + push the api and py images to GHCR on every push to main.
-# Optionally SSH to a deploy host to pull + restart if the operator has
-# the DEPLOY_* secrets set; the deploy job is otherwise skipped so forks
-# without that infra don't see a red X.
+# Operators pull the images from GHCR and deploy them wherever — this
+# workflow intentionally stays out of the deploy step so the public
+# repo doesn't carry infra-specific assumptions.
 
 on:
   push:
@@ -119,46 +119,8 @@ jobs:
           cache-to: type=gha,scope=py,mode=max
           provenance: false
 
-  deploy:
-    name: Deploy (optional, gated on DEPLOY_* secrets)
-    runs-on: ubuntu-latest
-    needs: [build-api, build-py]
-    # Skip on forks or operators without a deploy target configured.
-    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Abort early if any deploy secret is missing
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-        run: |
-          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_SSH_USER" ] || [ -z "$DEPLOY_SSH_KEY" ]; then
-            echo "::warning::DEPLOY_ENABLED is true but one of DEPLOY_HOST/DEPLOY_SSH_USER/DEPLOY_SSH_KEY is not set. Skipping."
-            exit 0
-          fi
-          echo "all required secrets present" >&2
-
-      - name: Configure SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Sync compose + pull + up
-        # Assumes /opt/toolkit/repo is a clone of this repo on the target host
-        # and /opt/toolkit/.env holds any runtime secrets (LLM_* in particular).
-        # Inode-preserving `cat src > dest` keeps Docker bind mounts live-updating.
-        run: |
-          ssh -i ~/.ssh/id_deploy "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_HOST }}" \
-            'set -e; cd /opt/toolkit; \
-             if [ ! -d repo ]; then git clone https://github.com/${{ github.repository }}.git repo; fi; \
-             cd repo && git fetch origin && git reset --hard ${{ github.sha }} && cd ..; \
-             cat repo/docker-compose.yml > docker-compose.yml; \
-             sed -i "/^IMAGE_TAG=/d" .env && echo "IMAGE_TAG=${{ github.sha }}" >> .env; \
-             docker compose pull; \
-             docker compose up -d --remove-orphans; \
-             sleep 15; \
-             docker exec toolkit-api wget -qO- http://localhost:3000/health > /dev/null && echo "healthy"'
+# Deployment is left to the operator. Pull the images from GHCR in your
+# own compose / k8s manifest, or fork this repo and add a deploy job
+# that suits your infrastructure. The repo intentionally ships no
+# SSH-based deploy step so nothing deploy-target-specific lives in the
+# public template.
