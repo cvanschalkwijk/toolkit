@@ -15,6 +15,7 @@ from __future__ import annotations
 import io
 import json
 import time
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
@@ -38,10 +39,15 @@ def _pick_engine_for_file(filename: str) -> str:
 # --- markitdown --------------------------------------------------------------
 
 
-def _markitdown_from_bytes(content: bytes, filename: str) -> str:
+@lru_cache(maxsize=1)
+def _markitdown():
     from markitdown import MarkItDown
 
-    md = MarkItDown()
+    return MarkItDown()
+
+
+def _markitdown_from_bytes(content: bytes, filename: str) -> str:
+    md = _markitdown()
     stream = io.BytesIO(content)
     ext = _ext(filename)
     kwargs = {"stream_info": {"extension": f".{ext}"}} if ext else {}
@@ -55,10 +61,7 @@ def _markitdown_from_bytes(content: bytes, filename: str) -> str:
 
 
 def _markitdown_from_url(url: str) -> str:
-    from markitdown import MarkItDown
-
-    md = MarkItDown()
-    result = md.convert(url)
+    result = _markitdown().convert(url)
     return str(result.text_content)
 
 
@@ -75,19 +78,28 @@ def _docling_output(doc, format_: OutputFormat) -> str:
     return str(doc.export_to_markdown())
 
 
-def _docling_from_bytes(content: bytes, filename: str, format_: OutputFormat) -> str:
+# Module-level singleton — docling's DocumentConverter loads ~500 MB of
+# layout / OCR / reading-order models at instantiation time. Rebuilding
+# it on every request added ~40s of serialization-overhead latency per
+# call, which dominates the actual conversion work. Cached via lru_cache
+# so the first call pays the warmup cost once per sidecar process.
+@lru_cache(maxsize=1)
+def _docling_converter():
     from docling.document_converter import DocumentConverter
+
+    return DocumentConverter()
+
+
+def _docling_from_bytes(content: bytes, filename: str, format_: OutputFormat) -> str:
     from docling_core.types.io import DocumentStream
 
     stream = DocumentStream(name=filename, stream=io.BytesIO(content))
-    result = DocumentConverter().convert(stream)
+    result = _docling_converter().convert(stream)
     return _docling_output(result.document, format_)
 
 
 def _docling_from_url(url: str, format_: OutputFormat) -> str:
-    from docling.document_converter import DocumentConverter
-
-    result = DocumentConverter().convert(url)
+    result = _docling_converter().convert(url)
     return _docling_output(result.document, format_)
 
 
