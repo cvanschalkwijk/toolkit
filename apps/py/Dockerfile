@@ -74,8 +74,14 @@ COPY apps/py/src/ ./src/
 # their model cache to $HOME/.cache, so we need it writable. A home-less
 # nologin user causes sentence-transformers to blow up with a PermissionError
 # on first model download.
+#
+# Pre-create the cache directory tree before dropping privileges. If a named
+# docker volume mounts onto /home/app/.cache, it inherits these perms on
+# first init — otherwise docker creates the mount point as root:root and the
+# app user can't write.
 RUN groupadd --gid 1000 app \
  && useradd --uid 1000 --gid 1000 --shell /bin/sh -m -d /home/app app \
+ && mkdir -p /home/app/.cache/huggingface /home/app/.cache/sentence-transformers \
  && chown -R app:app /app /home/app
 USER app
 
