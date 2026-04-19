@@ -28,7 +28,8 @@ export const chunkLateTool = defineTool({
       embedding_model: z
         .string()
         .optional()
-        .describe('HuggingFace model ID. Defaults to `jinaai/jina-embeddings-v3`.'),
+        .openapi({ example: 'jinaai/jina-embeddings-v3' })
+        .describe('HuggingFace model ID. Omit or leave blank to use `jinaai/jina-embeddings-v3`.'),
     })
     .openapi('ChunkLateInput'),
   output: z

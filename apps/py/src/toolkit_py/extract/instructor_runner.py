@@ -132,7 +132,9 @@ def _require_env(name: str) -> str:
 def run(params: dict) -> dict:
     text: str = params["text"]
     schema: dict[str, Any] = params["schema"]
-    model_override: str | None = params.get("model") or None
+    # Swagger UI pre-fills "string" into optional fields; treat that as unset.
+    raw_model = (params.get("model") or "").strip()
+    model_override: str | None = raw_model if raw_model and raw_model != "string" else None
     system_prompt: str = params.get("system_prompt") or (
         "You extract structured data from text. Return only values that are "
         "explicitly stated or can be directly inferred from the input. "

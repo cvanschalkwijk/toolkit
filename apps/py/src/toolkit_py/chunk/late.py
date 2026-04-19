@@ -53,7 +53,12 @@ def run(params: dict) -> dict:
     text: str = params["text"]
     chunk_size: int = int(params.get("chunk_size", 512))
     overlap: int = int(params.get("overlap", 50))
-    embedding_model: str = params.get("embedding_model") or _DEFAULT_MODEL
+
+    # See chunk/semantic.py — Swagger UI pre-fills optional string fields with
+    # the literal "string". Coerce empty / "string" to unset so we fall back
+    # to the default jina-v3 instead of trying to download it from HF.
+    raw = (params.get("embedding_model") or "").strip()
+    embedding_model: str = raw if raw and raw != "string" else _DEFAULT_MODEL
 
     tok, model = _load_model(embedding_model)
 

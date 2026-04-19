@@ -28,7 +28,12 @@ def run(params: dict) -> dict:
 
     text: str = params["text"]
     breakpoint_percentile: int = int(params.get("breakpoint_percentile", 95))
-    embedding_model: str = params.get("embedding_model") or _DEFAULT_MODEL
+
+    # Guard against Swagger UI's placeholder text being submitted verbatim —
+    # an optional `z.string()` field renders with "string" pre-filled, and
+    # users commonly forget to clear it. Treat empty / "string" as "unset".
+    raw = (params.get("embedding_model") or "").strip()
+    embedding_model: str = raw if raw and raw != "string" else _DEFAULT_MODEL
 
     encoder = _load_encoder(embedding_model)
     chunker = SemanticChunker(

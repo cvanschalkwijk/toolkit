@@ -22,14 +22,19 @@ export const extractStructuredTool = defineTool({
       model: z
         .string()
         .optional()
+        .openapi({ example: 'gemma-4-e4b-turboquant' })
         .describe(
-          'Override the model ID for this call. Defaults to the sidecar env LLM_DEFAULT_MODEL.',
+          'Override the model ID for this call. Omit or leave blank to use the sidecar env LLM_DEFAULT_MODEL.',
         ),
       system_prompt: z
         .string()
         .optional()
+        .openapi({
+          example:
+            'You extract structured data from text. Return only values explicitly stated in the input.',
+        })
         .describe(
-          'Override the system prompt. Defaults to a safe "extract only what\'s explicit" instruction.',
+          'Override the system prompt. Omit or leave blank to use a safe "extract only what\'s explicit" default.',
         ),
       max_retries: z
         .number()

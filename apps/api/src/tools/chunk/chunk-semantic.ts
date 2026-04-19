@@ -23,8 +23,9 @@ export const chunkSemanticTool = defineTool({
       embedding_model: z
         .string()
         .optional()
+        .openapi({ example: 'sentence-transformers/all-MiniLM-L6-v2' })
         .describe(
-          'HuggingFace model ID for the encoder. Defaults to `sentence-transformers/all-MiniLM-L6-v2` (small, fast).',
+          'HuggingFace model ID for the encoder. Omit or leave blank to use `sentence-transformers/all-MiniLM-L6-v2` (small, fast).',
         ),
     })
     .openapi('ChunkSemanticInput'),
