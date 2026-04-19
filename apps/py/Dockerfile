@@ -28,11 +28,23 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Runtime deps Presidio + docling expect at import time.
+# Runtime deps.
+# - wget + ca-certificates: healthcheck + outbound TLS
+# - libxcb1, libgl1, libglib2.0-0, libsm6, libxext6, libxrender1, libgomp1:
+#   opencv-python is pulled in by docling and has hard system-lib imports
+#   for X11/OpenGL at module init time, even in headless containers. Without
+#   these, `import cv2` fails with "libxcb.so.1: cannot open shared object".
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       wget \
       ca-certificates \
+      libxcb1 \
+      libgl1 \
+      libglib2.0-0 \
+      libsm6 \
+      libxext6 \
+      libxrender1 \
+      libgomp1 \
  && rm -rf /var/lib/apt/lists/*
 
 # --- deps (cache-friendly) ---------------------------------------------------
