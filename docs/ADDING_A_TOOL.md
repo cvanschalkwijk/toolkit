@@ -116,7 +116,63 @@ describe('reverse_text', () => {
 The input/output schemas are tested by the adapter tests. Your tool's test
 covers the `execute` logic.
 
-## 6. Run the full suite
+## 6. Write the per-tool doc
+
+Every tool must ship a companion doc at `docs/tools/<tool-name>.md`. The README's tools table links to it directly — leaving it out breaks discoverability.
+
+Template (mirrors the existing tool docs):
+
+```markdown
+# `reverse_text`
+
+One-sentence summary.
+
+## Purpose
+
+**When to use:** ...
+**When NOT to use:** ...
+
+## Signature
+
+- **HTTP:** `POST /text/reverse`
+- **MCP:** `reverse_text`
+
+## Input
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `text` | string | yes | — | ... |
+
+## Output
+
+\`\`\`json
+{ "reversed": "...", "length": 5 }
+\`\`\`
+
+## Examples
+
+### HTTP
+\`\`\`bash
+curl -sS -X POST http://localhost:3000/text/reverse -d '...'
+\`\`\`
+
+### MCP
+> *Use reverse_text to ...*
+
+## Notes & caveats
+- ...
+
+## See also
+- [Related tool](related.md)
+```
+
+Finally, add the link to the README's tools table so it's discoverable from the front page:
+
+```markdown
+| **Text** | [`reverse_text`](docs/tools/reverse-text.md) | Unicode-aware string reverse |
+```
+
+## 7. Run the full suite
 
 ```bash
 bun run validate

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sample Article for toolkit tests</title>
+</head>
+<body>
+  <h1>Introduction to Toolkit</h1>
+  <p>
+    <em>Toolkit</em> is a dual-interface utility API that exposes
+    common LLM-workflow primitives over both HTTP and the Model Context
+    Protocol. This fixture exists so conversion tests have a predictable
+    input shape.
+  </p>
+
+  <h2>Features</h2>
+  <ul>
+    <li>Document conversion (PDF, DOCX, HTML, and more)</li>
+    <li>Context-aware text chunking</li>
+    <li>PII sanitization via Microsoft Presidio</li>
+    <li>Structured extraction with automatic schema retries</li>
+  </ul>
+
+  <h2>Example table</h2>
+  <table>
+    <thead>
+      <tr><th>Category</th><th>Primary tool</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Conversion</td><td>convert_file</td></tr>
+      <tr><td>Chunking</td><td>chunk_semantic</td></tr>
+      <tr><td>Sanitization</td><td>sanitize_text</td></tr>
+      <tr><td>Structured</td><td>extract_structured</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    The test expects at least the title heading, one list item, and one
+    table row to survive the round-trip through any conversion engine.
+  </p>
+</body>
+</html>

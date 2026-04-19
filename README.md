@@ -11,12 +11,14 @@ Adding a tool is a single TypeScript file; it lights up on both interfaces autom
 
 ## Tools (v1)
 
+Each tool name links to its per-tool doc with full inputs, outputs, and examples.
+
 | Category | Tools | Backend |
 |---|---|---|
-| **Conversion** | `convert_file`, `convert_url` | [markitdown](https://github.com/microsoft/markitdown) + [docling](https://github.com/docling-project/docling) (auto-routed by format) |
-| **Chunking** | `chunk_semantic`, `chunk_late` | [sentence-transformers](https://www.sbert.net/) + LangChain `SemanticChunker`; [jina-embeddings-v3](https://huggingface.co/jinaai/jina-embeddings-v3) for true late-chunking |
-| **Sanitization** | `sanitize_text` | [Microsoft Presidio](https://microsoft.github.io/presidio/) |
-| **Structured output** | `extract_structured` | [Instructor](https://python.useinstructor.com/) + any OpenAI-compatible endpoint |
+| **Conversion** | [`convert_file`](docs/tools/convert-file.md), [`convert_url`](docs/tools/convert-url.md) | [markitdown](https://github.com/microsoft/markitdown) + [docling](https://github.com/docling-project/docling) (auto-routed by format) |
+| **Chunking** | [`chunk_semantic`](docs/tools/chunk-semantic.md), [`chunk_late`](docs/tools/chunk-late.md) | [sentence-transformers](https://www.sbert.net/) + LangChain `SemanticChunker`; [jina-embeddings-v3](https://huggingface.co/jinaai/jina-embeddings-v3) for true late-chunking |
+| **Sanitization** | [`sanitize_text`](docs/tools/sanitize-text.md) | [Microsoft Presidio](https://microsoft.github.io/presidio/) |
+| **Structured output** | [`extract_structured`](docs/tools/extract-structured.md) | [Instructor](https://python.useinstructor.com/) + any OpenAI-compatible endpoint |
 
 ## Quickstart
 

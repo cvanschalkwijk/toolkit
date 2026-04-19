@@ -5,13 +5,14 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  validate-bun:
+  bun:
     name: Bun (typecheck + lint + test)
     runs-on: ubuntu-latest
     steps:
@@ -25,7 +26,8 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Typecheck
-        run: bun --cwd apps/api run typecheck
+        working-directory: apps/api
+        run: bun run typecheck
 
       - name: Lint
         run: bun run lint
@@ -33,27 +35,120 @@ jobs:
       - name: Test
         run: bun test apps/api
 
-  validate-py:
-    name: Python (pytest)
+  py-filter:
+    name: Detect Python category changes
+    runs-on: ubuntu-latest
+    outputs:
+      convert: ${{ steps.f.outputs.convert }}
+      chunk: ${{ steps.f.outputs.chunk }}
+      sanitize: ${{ steps.f.outputs.sanitize }}
+      extract: ${{ steps.f.outputs.extract }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            convert:
+              - 'apps/py/src/toolkit_py/convert/**'
+              - 'apps/py/src/toolkit_py/main.py'
+              - 'apps/py/src/toolkit_py/errors.py'
+              - 'apps/py/tests/test_convert*'
+              - 'apps/py/tests/conftest.py'
+              - 'apps/py/tests/fixtures/**'
+              - 'apps/py/pyproject.toml'
+            chunk:
+              - 'apps/py/src/toolkit_py/chunk/**'
+              - 'apps/py/src/toolkit_py/main.py'
+              - 'apps/py/src/toolkit_py/errors.py'
+              - 'apps/py/tests/test_chunk*'
+              - 'apps/py/tests/conftest.py'
+              - 'apps/py/pyproject.toml'
+            sanitize:
+              - 'apps/py/src/toolkit_py/sanitize/**'
+              - 'apps/py/src/toolkit_py/main.py'
+              - 'apps/py/src/toolkit_py/errors.py'
+              - 'apps/py/tests/test_sanitize*'
+              - 'apps/py/tests/conftest.py'
+              - 'apps/py/pyproject.toml'
+            extract:
+              - 'apps/py/src/toolkit_py/extract/**'
+              - 'apps/py/src/toolkit_py/main.py'
+              - 'apps/py/src/toolkit_py/errors.py'
+              - 'apps/py/tests/test_extract*'
+              - 'apps/py/tests/conftest.py'
+              - 'apps/py/pyproject.toml'
+
+  py-convert:
+    name: Python convert
+    needs: py-filter
+    if: ${{ needs.py-filter.outputs.convert == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: astral-sh/setup-uv@v4
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install deps (framework only for now)
-        # Later phases add the full engine stack; gate them behind the
-        # category they ship with.
-        working-directory: apps/py
+      - run: uv python install 3.12
+      - working-directory: apps/py
         run: |
           uv venv --python 3.12 .venv
-          uv pip install --python .venv 'fastapi>=0.115' 'uvicorn[standard]>=0.32' pytest pytest-asyncio httpx
-
-      - name: Pytest
-        working-directory: apps/py
+          uv pip install --python .venv '.[convert,dev]'
+      - working-directory: apps/py
         run: |
           source .venv/bin/activate
-          pytest -q || [ $? -eq 5 ]  # exit 5 = no tests collected, OK for Phase 1
+          pytest -q tests/test_convert.py
+
+  py-chunk:
+    name: Python chunk
+    needs: py-filter
+    if: ${{ needs.py-filter.outputs.chunk == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.12
+      - working-directory: apps/py
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv '.[chunk,dev]'
+      - working-directory: apps/py
+        run: |
+          source .venv/bin/activate
+          pytest -q tests/test_chunk.py
+
+  py-sanitize:
+    name: Python sanitize
+    needs: py-filter
+    if: ${{ needs.py-filter.outputs.sanitize == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.12
+      - working-directory: apps/py
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv '.[sanitize,dev]'
+          source .venv/bin/activate
+          python -m spacy download en_core_web_lg
+      - working-directory: apps/py
+        run: |
+          source .venv/bin/activate
+          pytest -q tests/test_sanitize.py
+
+  py-extract:
+    name: Python extract
+    needs: py-filter
+    if: ${{ needs.py-filter.outputs.extract == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.12
+      - working-directory: apps/py
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv '.[extract,dev]'
+      - working-directory: apps/py
+        run: |
+          source .venv/bin/activate
+          pytest -q tests/test_extract.py
