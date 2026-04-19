@@ -39,6 +39,12 @@ services:
     restart: unless-stopped
     networks:
       - toolkit-net
+    volumes:
+      # Persist HuggingFace + sentence-transformers model caches across
+      # restarts so jina-v3 / MiniLM don't re-download every time the
+      # container comes up. Small (~1-2 GB once populated). Delete the
+      # volume if you ever need to reset / upgrade models.
+      - toolkit-model-cache:/home/app/.cache
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
       interval: 30s
@@ -49,3 +55,6 @@ services:
 networks:
   toolkit-net:
     name: toolkit-net
+
+volumes:
+  toolkit-model-cache:

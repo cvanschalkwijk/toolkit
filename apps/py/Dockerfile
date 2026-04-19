@@ -70,10 +70,20 @@ COPY --from=deps /usr/local/bin /usr/local/bin
 COPY apps/py/pyproject.toml ./
 COPY apps/py/src/ ./src/
 
-# Non-root user.
-RUN groupadd --gid 1000 app && useradd --uid 1000 --gid 1000 --shell /bin/sh app \
- && chown -R app:app /app
+# Non-root user with a real home — HuggingFace / spaCy / torch all default
+# their model cache to $HOME/.cache, so we need it writable. A home-less
+# nologin user causes sentence-transformers to blow up with a PermissionError
+# on first model download.
+RUN groupadd --gid 1000 app \
+ && useradd --uid 1000 --gid 1000 --shell /bin/sh -m -d /home/app app \
+ && chown -R app:app /app /home/app
 USER app
+
+# Point the HF / transformers caches at a known writable directory so the
+# download location doesn't depend on $HOME resolution quirks.
+ENV HF_HOME=/home/app/.cache/huggingface \
+    TRANSFORMERS_CACHE=/home/app/.cache/huggingface \
+    SENTENCE_TRANSFORMERS_HOME=/home/app/.cache/sentence-transformers
 
 EXPOSE 8000
 
