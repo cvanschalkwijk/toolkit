@@ -11,9 +11,15 @@ from __future__ import annotations
 import pytest
 
 
+# Avoid `123-45-6789` as the SSN — Presidio 2.2+ explicitly invalidates
+# common sample SSNs (123456789, 987654321, 078051120, etc.) to reduce
+# false positives from tutorials and documentation. Use a number that
+# matches the validation rules (area ≠ 000/666/9XX, group ≠ 00, serial
+# ≠ 0000) but isn't on that blocklist.
+REAL_LOOKING_SSN = "412-73-8294"
 TEXT_WITH_PII = (
     "Please reach Alice Jones at alice.jones@example.com or call 415-555-0100. "
-    "Her SSN is 123-45-6789. She lives in San Francisco."
+    f"Her SSN is {REAL_LOOKING_SSN}. She lives in San Francisco."
 )
 
 
@@ -41,7 +47,7 @@ def test_redact_mode_returns_spans_and_redacted_text() -> None:
     # All the obvious PII is gone from the sanitized text.
     assert "alice.jones@example.com" not in result["sanitized_text"]
     assert "415-555-0100" not in result["sanitized_text"]
-    assert "123-45-6789" not in result["sanitized_text"]
+    assert REAL_LOOKING_SSN not in result["sanitized_text"]
 
     # Redaction markers are present.
     assert "<REDACTED>" in result["sanitized_text"]
