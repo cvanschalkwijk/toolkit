@@ -44,3 +44,12 @@ export function env(): Env {
   cached = parsed.data
   return cached
 }
+
+/**
+ * Clears the env() cache. Tests that mutate process.env in beforeEach need
+ * this so the next env() call re-reads — otherwise cross-file run order
+ * determines which test wins the cache. Not for production code.
+ */
+export function __resetEnvCacheForTests(): void {
+  cached = undefined
+}

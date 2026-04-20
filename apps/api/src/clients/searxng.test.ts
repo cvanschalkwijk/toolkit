@@ -5,19 +5,22 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { __resetEnvCacheForTests } from '../lib/env'
 import { SearxngError, searxng } from './searxng'
 
 const originalFetch = globalThis.fetch
 
-// env() caches on first call — which may be from another test file that ran
-// first in the suite. Setting SEARXNG_URL here matches the module default so
-// assertions hold regardless of cache population order.
+// env() caches on first call. Reset before each test so mutations to
+// process.env actually take effect, and reset after so downstream test
+// files start with a clean cache regardless of run order.
 beforeEach(() => {
+  __resetEnvCacheForTests()
   process.env.SEARXNG_URL = 'http://searxng:8080'
 })
 
 afterEach(() => {
   globalThis.fetch = originalFetch
+  __resetEnvCacheForTests()
 })
 
 function mockFetch(impl: (url: string, init?: RequestInit) => Promise<Response>) {

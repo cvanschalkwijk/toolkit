@@ -1,14 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { __resetEnvCacheForTests } from '../../lib/env'
 import { webSearchTool } from './web-search'
 
 const originalFetch = globalThis.fetch
 
 beforeEach(() => {
+  __resetEnvCacheForTests()
   process.env.SEARXNG_URL = 'http://searxng:8080'
 })
 
 afterEach(() => {
   globalThis.fetch = originalFetch
+  __resetEnvCacheForTests()
 })
 
 function stubSearxng(body: unknown) {
