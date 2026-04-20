@@ -7,10 +7,13 @@ const originalFetch = globalThis.fetch
 beforeEach(() => {
   __resetEnvCacheForTests()
   process.env.SEARXNG_URL = 'http://searxng:8080'
+  // Default: reranker unconfigured so legacy tests see SearXNG's order.
+  Reflect.deleteProperty(process.env, 'RERANKER_URL')
 })
 
 afterEach(() => {
   globalThis.fetch = originalFetch
+  Reflect.deleteProperty(process.env, 'RERANKER_URL')
   __resetEnvCacheForTests()
 })
 
@@ -54,6 +57,7 @@ describe('webSearchTool', () => {
       safesearch: 1,
       pageno: 1,
       max_results: 10,
+      rerank: 'auto',
     })
 
     expect(out.query).toBe('claude')
@@ -97,6 +101,7 @@ describe('webSearchTool', () => {
       safesearch: 1,
       pageno: 1,
       max_results: 3,
+      rerank: 'auto',
     })
 
     expect(out.results).toHaveLength(3)
@@ -116,6 +121,7 @@ describe('webSearchTool', () => {
       safesearch: 2,
       pageno: 1,
       max_results: 10,
+      rerank: 'auto',
     })
 
     const u = new URL(getUrl())
@@ -151,5 +157,165 @@ describe('webSearchTool', () => {
     expect(webSearchTool.category).toBe('web')
     expect(webSearchTool.http.path).toBe('/web/search')
     expect(webSearchTool.input.shape).toBeDefined()
+  })
+
+  describe('rerank integration', () => {
+    /**
+     * Stub both SearXNG and the reranker on a single fetch. Discriminates
+     * by URL so we can return different payloads to each backend.
+     */
+    function stubBoth(searxngBody: unknown, rerankerBody: unknown) {
+      globalThis.fetch = (async (url: string) => {
+        if (url.includes('searxng')) {
+          return new Response(JSON.stringify(searxngBody), { status: 200 })
+        }
+        if (url.includes('/rerank')) {
+          return new Response(JSON.stringify(rerankerBody), { status: 200 })
+        }
+        throw new Error(`unexpected fetch: ${url}`)
+      }) as unknown as typeof fetch
+    }
+
+    test('rerank="auto" with RERANKER_URL unset leaves native order', async () => {
+      stubSearxng({
+        query: 'q',
+        results: [
+          { title: 'A', url: 'https://a', content: 'aaa', engine: 'ddg' },
+          { title: 'B', url: 'https://b', content: 'bbb', engine: 'ddg' },
+        ],
+      })
+      const out = await webSearchTool.execute({
+        query: 'q',
+        safesearch: 1,
+        pageno: 1,
+        max_results: 5,
+        rerank: 'auto',
+      })
+      expect(out.reranker_used).toBe(false)
+      expect(out.results[0]?.title).toBe('A')
+      expect(out.results[0]?.rerank_score).toBeUndefined()
+    })
+
+    test('rerank="auto" with RERANKER_URL set reorders by reranker score', async () => {
+      process.env.RERANKER_URL = 'http://reranker.test:7997'
+      __resetEnvCacheForTests()
+
+      stubBoth(
+        {
+          query: 'q',
+          results: [
+            { title: 'A', url: 'https://a', content: 'aaa', engine: 'ddg' },
+            { title: 'B', url: 'https://b', content: 'bbb', engine: 'ddg' },
+            { title: 'C', url: 'https://c', content: 'ccc', engine: 'ddg' },
+          ],
+        },
+        {
+          results: [
+            { index: 2, relevance_score: 0.9 },
+            { index: 0, relevance_score: 0.5 },
+            { index: 1, relevance_score: 0.1 },
+          ],
+        },
+      )
+
+      const out = await webSearchTool.execute({
+        query: 'q',
+        safesearch: 1,
+        pageno: 1,
+        max_results: 5,
+        rerank: 'auto',
+      })
+      expect(out.reranker_used).toBe(true)
+      expect(out.results.map((r) => r.title)).toEqual(['C', 'A', 'B'])
+      expect(out.results[0]?.rerank_score).toBeCloseTo(0.9, 3)
+      expect(out.results[2]?.rerank_score).toBeCloseTo(0.1, 3)
+    })
+
+    test('rerank="on" without RERANKER_URL throws', async () => {
+      stubSearxng({
+        query: 'q',
+        results: [{ title: 'A', url: 'https://a', content: '', engine: 'x' }],
+      })
+      await expect(
+        webSearchTool.execute({
+          query: 'q',
+          safesearch: 1,
+          pageno: 1,
+          max_results: 5,
+          rerank: 'on',
+        }),
+      ).rejects.toThrow(/RERANKER_URL/)
+    })
+
+    test('rerank="off" with RERANKER_URL set skips the reranker call', async () => {
+      process.env.RERANKER_URL = 'http://reranker.test:7997'
+      __resetEnvCacheForTests()
+
+      let rerankerHit = false
+      globalThis.fetch = (async (url: string) => {
+        if (url.includes('searxng')) {
+          return new Response(
+            JSON.stringify({
+              query: 'q',
+              results: [{ title: 'A', url: 'https://a', content: 'x', engine: 'ddg' }],
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/rerank')) {
+          rerankerHit = true
+          return new Response(JSON.stringify({ results: [] }), { status: 200 })
+        }
+        throw new Error(`unexpected fetch: ${url}`)
+      }) as unknown as typeof fetch
+
+      const out = await webSearchTool.execute({
+        query: 'q',
+        safesearch: 1,
+        pageno: 1,
+        max_results: 5,
+        rerank: 'off',
+      })
+      expect(rerankerHit).toBe(false)
+      expect(out.reranker_used).toBe(false)
+    })
+
+    test('reranker reordering runs BEFORE max_results truncation', async () => {
+      process.env.RERANKER_URL = 'http://reranker.test:7997'
+      __resetEnvCacheForTests()
+
+      // 5 SearXNG results; reranker says result #4 is best. With max_results=2
+      // we should see #4 and the next-highest-scored one, NOT the first
+      // two from SearXNG's native order.
+      stubBoth(
+        {
+          query: 'q',
+          results: Array.from({ length: 5 }, (_, i) => ({
+            title: `t${i}`,
+            url: `https://e/${i}`,
+            content: `c${i}`,
+            engine: 'ddg',
+          })),
+        },
+        {
+          results: [
+            { index: 4, relevance_score: 0.99 },
+            { index: 2, relevance_score: 0.8 },
+            { index: 0, relevance_score: 0.5 },
+            { index: 1, relevance_score: 0.2 },
+            { index: 3, relevance_score: 0.1 },
+          ],
+        },
+      )
+
+      const out = await webSearchTool.execute({
+        query: 'q',
+        safesearch: 1,
+        pageno: 1,
+        max_results: 2,
+        rerank: 'auto',
+      })
+      expect(out.results.map((r) => r.title)).toEqual(['t4', 't2'])
+    })
   })
 })

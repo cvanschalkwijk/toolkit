@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi'
+import { isRerankerConfigured, rerank } from '../../clients/reranker'
 import { searxng } from '../../clients/searxng'
 import { defineTool } from '../../lib/tool'
 
@@ -24,6 +25,12 @@ const searxngResultSchema = z
     score: z.number().optional(),
     published_date: z.string().optional(),
     category: z.string().optional(),
+    /**
+     * Cross-encoder relevance score in [0, 1] from the reranker (when it
+     * ran). Higher = more relevant. Only populated if RERANKER_URL is set
+     * and rerank wasn't disabled for this call.
+     */
+    rerank_score: z.number().optional(),
   })
   .openapi('WebSearchResult')
 
@@ -116,6 +123,12 @@ export const webSearchTool = defineTool({
         .max(50)
         .default(10)
         .describe('Maximum results returned to the caller after SearXNG dedupe.'),
+      rerank: z
+        .enum(['auto', 'on', 'off'])
+        .default('auto')
+        .describe(
+          '`auto` (default): rerank results via the configured backend (RERANKER_URL) when one is set, otherwise return SearXNG\u2019s native ordering. `on`: require rerank and error if RERANKER_URL is unset. `off`: skip rerank even if configured.',
+        ),
     })
     .openapi('WebSearchInput'),
   output: z
@@ -125,6 +138,7 @@ export const webSearchTool = defineTool({
       suggestions: z.array(z.string()),
       answers: z.array(z.string()),
       infoboxes: z.array(searxngInfoboxSchema),
+      reranker_used: z.boolean(),
       duration_ms: z.number().int(),
     })
     .openapi('WebSearchOutput'),
@@ -140,7 +154,11 @@ export const webSearchTool = defineTool({
       pageno: input.pageno,
     })
 
-    const results = (raw.results ?? []).slice(0, input.max_results).map((r) => ({
+    // Map SearXNG's verbose shape to our trimmed schema. Keep ALL results
+    // (not just max_results) so the reranker can see the full candidate
+    // set before we trim — a good hit buried at rank 20 in SearXNG's
+    // native order can surface to the top after rerank.
+    let results = (raw.results ?? []).map((r) => ({
       title: r.title,
       url: r.url,
       snippet: r.content ?? '',
@@ -148,7 +166,56 @@ export const webSearchTool = defineTool({
       score: r.score,
       published_date: r.publishedDate,
       category: r.category,
+      rerank_score: undefined as number | undefined,
     }))
+
+    const shouldRerank =
+      input.rerank === 'on' || (input.rerank === 'auto' && isRerankerConfigured())
+    if (input.rerank === 'on' && !isRerankerConfigured()) {
+      // Explicit request with no backend — surface the misconfiguration.
+      throw new Error(
+        'rerank="on" but RERANKER_URL is not configured. Set RERANKER_URL or pass rerank="auto"/"off".',
+      )
+    }
+
+    let rerankerUsed = false
+    if (shouldRerank && results.length > 1) {
+      // Build (query, snippet) pairs. bge-reranker-v2-m3 caps at 512
+      // tokens; SearXNG snippets are short enough that this is a
+      // non-issue. If a backend with a different length limit ever
+      // needs trimming, this is the place.
+      const documents = results.map(
+        (r) =>
+          // Fall back to title when the engine returned no snippet (some do).
+          r.snippet || r.title,
+      )
+      const scored = await rerank({
+        query: input.query,
+        documents,
+        // Ask for at least the user's max_results; the backend may return
+        // fewer if document count is lower.
+        topN: Math.min(results.length, Math.max(input.max_results, 10)),
+      })
+      // Re-order results by reranker output + attach scores. Any entries
+      // the reranker didn't return keep their native position at the end.
+      const seen = new Set<number>()
+      const reordered = scored
+        .filter((s) => s.index >= 0 && s.index < results.length)
+        .map((s) => {
+          seen.add(s.index)
+          const base = results[s.index]
+          if (!base) return undefined
+          return { ...base, rerank_score: s.score }
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== undefined)
+      const leftovers = results.filter((_, i) => !seen.has(i))
+      results = [...reordered, ...leftovers]
+      rerankerUsed = true
+    }
+
+    // Trim to max_results AFTER rerank so the reorder gets a chance to
+    // surface better hits from outside the top-N.
+    results = results.slice(0, input.max_results)
 
     const infoboxes = (raw.infoboxes ?? []).map((ib) => ({
       title: ib.infobox ?? '',
@@ -162,6 +229,7 @@ export const webSearchTool = defineTool({
       suggestions: raw.suggestions ?? [],
       answers: raw.answers ?? [],
       infoboxes,
+      reranker_used: rerankerUsed,
       duration_ms: Date.now() - started,
     }
   },
