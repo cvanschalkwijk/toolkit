@@ -47,6 +47,10 @@ services:
       - LLM_BASE_URL=${LLM_BASE_URL:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_DEFAULT_MODEL=${LLM_DEFAULT_MODEL:-}
+      # Only used when a convert_url call sets fetcher="stealth". Default
+      # points at the bundled flaresolverr service (profile: stealth).
+      # Set to empty or another URL to use your own instance.
+      - FLARESOLVERR_URL=${FLARESOLVERR_URL:-http://flaresolverr:8191}
     networks:
       - toolkit-net
     volumes:
@@ -74,8 +78,14 @@ services:
     restart: unless-stopped
     environment:
       # SearXNG reads SEARXNG_SECRET at boot and substitutes it into
-      # server.secret_key. Generate with `openssl rand -hex 32`. Required.
-      - SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET must be set when using --profile search}
+      # server.secret_key. Generate with `openssl rand -hex 32`. If left
+      # unset the container boots with the literal "CHANGE_ME" from
+      # settings.yml — fine for local dev, NOT fine for anything exposed.
+      # We deliberately don't use ${:?required} here: that interpolation
+      # fires at compose-parse time for every service (including this
+      # one) even when the `search` profile is not active, which would
+      # block `docker compose up` without the search profile.
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-}
       - SEARXNG_BASE_URL=http://searxng:8080/
     volumes:
       # Checked-in minimal config. Enables the JSON API (off by default in
@@ -95,6 +105,45 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  flaresolverr:
+    # Cloudflare / bot-detection bypass proxy. Gated behind the `stealth`
+    # profile so the ~500 MB image + headful Chromium aren't pulled by
+    # default. Bring it up with:
+    #   docker compose --profile stealth up -d
+    # The py sidecar routes HTML fetches through here when a convert_url
+    # call sets fetcher="stealth".
+    image: ghcr.io/flaresolverr/flaresolverr:latest@sha256:7962759d99d7e125e108e0f5e7f3cdbcd36161776d058d1d9b7153b92ef1af9e
+    container_name: toolkit-flaresolverr
+    profiles: ["stealth"]
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=${FLARESOLVERR_LOG_LEVEL:-info}
+      - TZ=${TZ:-UTC}
+      # We deliberately do not enable paid captcha solvers here — toolkit
+      # stays key-free by default. Set CAPTCHA_SOLVER to "hcaptcha-solver"
+      # or similar via env override if you bring your own integration.
+      - CAPTCHA_SOLVER=${FLARESOLVERR_CAPTCHA_SOLVER:-none}
+    # Optional loopback-only publish of the API so you can test challenges
+    # with curl against 127.0.0.1:8191/v1. Override FLARESOLVERR_BIND to
+    # expose wider (e.g. 100.x.x.x:8191) or unset the port entirely in a
+    # compose override.
+    ports:
+      - "${FLARESOLVERR_BIND:-127.0.0.1:8191}:8191"
+    networks:
+      - toolkit-net
+    # FlareSolverr serves its readiness JSON at `/` (no dedicated /health).
+    # The image ships Python but not wget or curl, so probe via urllib.
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8191/').read()"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
 networks:
   toolkit-net:
