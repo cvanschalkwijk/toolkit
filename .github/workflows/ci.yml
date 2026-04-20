@@ -11,6 +11,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Opt in to Node 24 for every JS-based action in this workflow. GitHub is
+# forcing the switch in mid-2026; setting it explicitly now silences the
+# deprecation banner and surfaces any Node-24 incompatibility ahead of the
+# cutoff.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   bun:
     name: Bun (typecheck + lint + test)

@@ -22,6 +22,10 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_OWNER: ${{ github.repository_owner }}
+  # Opt in to Node 24 for every JS-based action in this workflow. GitHub
+  # is forcing the switch in mid-2026; setting it now silences the
+  # deprecation banner and surfaces any Node-24 incompatibility early.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 permissions:
   contents: read
