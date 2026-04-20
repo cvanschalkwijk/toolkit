@@ -21,6 +21,7 @@ from typing import Literal
 
 EngineChoice = Literal["auto", "markitdown", "docling"]
 OutputFormat = Literal["markdown", "json", "html"]
+FetcherChoice = Literal["direct", "stealth"]
 
 # Extensions that docling handles best.
 _DOCLING_EXTENSIONS = frozenset({"pdf", "docx", "pptx", "xlsx"})
@@ -136,25 +137,70 @@ def convert_url(
     url: str,
     engine: EngineChoice,
     format_: OutputFormat,
+    fetcher: FetcherChoice = "direct",
 ) -> dict:
+    from .fetch import fetch_html
+
     start = time.perf_counter()
     # For URLs `auto` defaults to markitdown — it handles HTML + YouTube +
     # audio URLs natively. Operators who specifically want docling's PDF
     # handling on a URL pointing at a PDF can pass engine="docling".
     chosen = "markitdown" if engine == "auto" else engine
-    if chosen == "docling":
-        text = _docling_from_url(url, format_)
-    elif chosen == "markitdown":
-        text = _markitdown_from_url(url)
+
+    if fetcher == "direct":
+        # Fast path — hand the URL to the engine and let its own HTTP client
+        # do the fetch. markitdown handles YouTube / audio / HTML this way.
+        if chosen == "docling":
+            text = _docling_from_url(url, format_)
+        elif chosen == "markitdown":
+            text = _markitdown_from_url(url)
+        else:
+            raise ValueError(f"unknown engine: {engine}")
     else:
-        raise ValueError(f"unknown engine: {engine}")
+        # Stealth path — fetch via FlareSolverr first (so CF / WAF
+        # challenges get solved), then feed the resulting HTML bytes
+        # through the chosen engine. The engine never sees the URL —
+        # only the rendered HTML — so markitdown's URL-specific handlers
+        # (YouTube transcript, audio transcription) won't fire on this
+        # path. That's intentional: if you need those, use fetcher="direct".
+        fetched = fetch_html(url, fetcher="stealth")
+        # FlareSolverr returns HTML regardless of the actual URL type —
+        # give the engine a filename hint so it dispatches to the HTML
+        # parser, not some other format guess.
+        synthetic_name = _synthetic_filename_for_url(url, fetched.content_type)
+        if chosen == "docling":
+            text = _docling_from_bytes(fetched.content, synthetic_name, format_)
+        elif chosen == "markitdown":
+            text = _markitdown_from_bytes(fetched.content, synthetic_name)
+        else:
+            raise ValueError(f"unknown engine: {engine}")
+
     return {
         "markdown": text,
         "engine_used": chosen,
+        "fetcher_used": fetcher,
         "format": format_,
         "source": {"url": url},
         "duration_ms": int((time.perf_counter() - start) * 1000),
     }
+
+
+def _synthetic_filename_for_url(url: str, content_type: str) -> str:
+    """Fabricate a filename so byte-based engines pick the HTML parser.
+
+    FlareSolverr always returns HTML (the rendered page), so extension
+    sniffing against the original URL (`.pdf`, `.docx`, …) would mislead
+    the engine. Prefer `.html` unless the response content-type says
+    otherwise.
+    """
+    ct = (content_type or "").lower()
+    if "html" in ct or not ct:
+        return "page.html"
+    if "json" in ct:
+        return "page.json"
+    if "xml" in ct:
+        return "page.xml"
+    return "page.txt"
 
 
 def convert_local_path(

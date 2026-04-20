@@ -68,12 +68,22 @@ async def health() -> dict:
 
 EngineChoice = Literal["auto", "markitdown", "docling"]
 OutputFormat = Literal["markdown", "json", "html"]
+FetcherChoice = Literal["direct", "stealth"]
 
 
 class ConvertUrlRequest(BaseModel):
     url: str = Field(..., description="Absolute URL to fetch and convert.")
     engine: EngineChoice = Field("auto")
     format: OutputFormat = Field("markdown")
+    fetcher: FetcherChoice = Field(
+        "direct",
+        description=(
+            "Which fetch path to use. 'direct' lets the engine fetch the URL "
+            "itself (cheap, fast, fine for most public pages). 'stealth' "
+            "routes through FlareSolverr to bypass Cloudflare / WAF "
+            "challenges and hand the engine the post-challenge HTML."
+        ),
+    )
 
 
 @app.post("/convert/file")
@@ -106,7 +116,7 @@ async def convert_url(body: ConvertUrlRequest) -> dict:
 
     try:
         return await asyncio.to_thread(
-            engines.convert_url, body.url, body.engine, body.format
+            engines.convert_url, body.url, body.engine, body.format, body.fetcher
         )
     except Exception as e:  # noqa: BLE001
         raise map_exception(e) from e

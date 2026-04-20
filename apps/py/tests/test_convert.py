@@ -80,3 +80,86 @@ def test_convert_url_fetches_and_converts() -> None:
     assert result["engine_used"] == "markitdown"
     assert len(result["markdown"]) > 500
     assert result["source"] == {"url": "https://en.wikipedia.org/wiki/Markdown"}
+
+
+def test_fetch_stealth_requires_flaresolverr_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("requests")
+    from toolkit_py.convert.fetch import FetchError, fetch_html
+
+    monkeypatch.delenv("FLARESOLVERR_URL", raising=False)
+    with pytest.raises(FetchError, match="FLARESOLVERR_URL"):
+        fetch_html("https://example.com", fetcher="stealth")
+
+
+def test_fetch_stealth_parses_flaresolverr_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("requests")
+    import requests
+
+    from toolkit_py.convert import fetch as fetch_mod
+
+    monkeypatch.setenv("FLARESOLVERR_URL", "http://flaresolverr.test:8191")
+
+    captured: dict = {}
+
+    class _Resp:
+        ok = True
+        status_code = 200
+
+        def json(self) -> dict:
+            return {
+                "status": "ok",
+                "solution": {
+                    "url": "https://cf-walled.example.com",
+                    "status": 200,
+                    "response": "<html><body>after challenge</body></html>",
+                    "headers": {"Content-Type": "text/html; charset=utf-8"},
+                },
+            }
+
+    def _fake_post(url: str, json=None, timeout=None, **_: object) -> _Resp:  # noqa: A002
+        captured["url"] = url
+        captured["body"] = json
+        captured["timeout"] = timeout
+        return _Resp()
+
+    monkeypatch.setattr(requests, "post", _fake_post)
+
+    r = fetch_mod.fetch_html(
+        "https://cf-walled.example.com", fetcher="stealth", timeout_s=30
+    )
+
+    assert captured["url"] == "http://flaresolverr.test:8191/v1"
+    assert captured["body"] == {
+        "cmd": "request.get",
+        "url": "https://cf-walled.example.com",
+        "maxTimeout": 30_000,
+    }
+    assert r.fetcher_used == "stealth"
+    assert r.content == b"<html><body>after challenge</body></html>"
+    assert r.content_type.startswith("text/html")
+    assert r.status_code == 200
+
+
+def test_fetch_stealth_surfaces_flaresolverr_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("requests")
+    import requests
+
+    from toolkit_py.convert import fetch as fetch_mod
+
+    monkeypatch.setenv("FLARESOLVERR_URL", "http://flaresolverr.test:8191")
+
+    class _Resp:
+        ok = True
+        status_code = 200
+
+        def json(self) -> dict:
+            return {"status": "error", "message": "Challenge detected but solver is not enabled"}
+
+    monkeypatch.setattr(requests, "post", lambda *a, **kw: _Resp())
+
+    with pytest.raises(fetch_mod.FetchError, match="solver is not enabled"):
+        fetch_mod.fetch_html("https://cf.example.com", fetcher="stealth")
