@@ -8,6 +8,28 @@ const schema = z.object({
   // SearXNG metasearch instance used by the web_search tool. Default points at
   // the bundled docker-compose `searxng` service; override for BYO instances.
   SEARXNG_URL: z.string().url().default('http://searxng:8080'),
+  // Optional Cohere-compatible reranker endpoint. When set, web_search
+  // re-orders SearXNG results via POST {URL}/rerank, and the standalone
+  // `rerank` tool becomes usable. Point at any service that speaks the
+  // /rerank shape — Infinity, HuggingFace TEI, Cohere's hosted API, a
+  // self-hosted FlagEmbedding wrapper, etc. Model cards to deploy behind
+  // it: https://huggingface.co/BAAI/bge-reranker-v2-m3 (recommended
+  // default — multilingual, 568M, fast) or bge-reranker-v2-gemma /
+  // bge-reranker-v2-minicpm-layerwise when you want higher quality on
+  // longer English/Chinese queries. Leave unset to disable reranking.
+  // (Ollama does not serve rerankers natively as of early 2026 — use
+  // Infinity or TEI if you're on that side of the ecosystem.)
+  RERANKER_URL: z
+    .string()
+    .url()
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => v || undefined),
+  // BAAI/bge-reranker-v2-m3 is the recommended default — multilingual,
+  // 568M params, ~1.5 GB VRAM at fp16, 512-token sequence cap. Override
+  // if your backend is serving a different cross-encoder.
+  // See https://huggingface.co/BAAI/bge-reranker-v2-m3 for the model card.
+  RERANKER_MODEL: z.string().default('BAAI/bge-reranker-v2-m3'),
   // LLM backend only required by the extract_structured tool; empty is OK.
   LLM_BASE_URL: z
     .string()
