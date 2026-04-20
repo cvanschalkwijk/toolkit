@@ -19,6 +19,7 @@ Each tool name links to its per-tool doc with full inputs, outputs, and examples
 | **Chunking** | [`chunk_semantic`](docs/tools/chunk-semantic.md), [`chunk_late`](docs/tools/chunk-late.md) | [sentence-transformers](https://www.sbert.net/) + LangChain `SemanticChunker`; [jina-embeddings-v3](https://huggingface.co/jinaai/jina-embeddings-v3) for true late-chunking |
 | **Sanitization** | [`sanitize_text`](docs/tools/sanitize-text.md) | [Microsoft Presidio](https://microsoft.github.io/presidio/) |
 | **Structured output** | [`extract_structured`](docs/tools/extract-structured.md) | [Instructor](https://python.useinstructor.com/) + any OpenAI-compatible endpoint |
+| **Web** | [`web_search`](docs/tools/web-search.md) | [SearXNG](https://github.com/searxng/searxng) metasearch (BYO instance or `docker compose --profile search up`) |
 
 ## Quickstart
 
@@ -28,6 +29,15 @@ cd ~/workspace/toolkit
 cp .env.example .env      # edit LLM_* vars if you want extract_structured
 docker compose up -d
 ```
+
+To also bring up the bundled SearXNG backend for `web_search`:
+
+```bash
+export SEARXNG_SECRET=$(openssl rand -hex 32)    # or set it in .env
+docker compose --profile search up -d
+```
+
+The SearXNG debug UI is reachable at <http://localhost:8080> (loopback-only by default).
 
 Then:
 
