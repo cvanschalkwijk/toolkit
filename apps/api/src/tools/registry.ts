@@ -1,7 +1,9 @@
 import { type StoredTool, toStored } from '../lib/tool'
 import { chunkLateTool, chunkSemanticTool } from './chunk'
+import { classifyDomainTool } from './classify'
 import { convertFileTool, convertUrlTool } from './convert'
 import { extractStructuredTool } from './extract'
+import { detectIntentTool } from './intent'
 import { pingTool } from './ping'
 import { rerankTool } from './rerank'
 import { sanitizeTextTool } from './sanitize'
@@ -23,4 +25,6 @@ export const tools: StoredTool[] = [
   toStored(extractStructuredTool),
   toStored(webSearchTool),
   toStored(rerankTool),
+  toStored(classifyDomainTool),
+  toStored(detectIntentTool),
 ]
