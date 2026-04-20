@@ -82,11 +82,9 @@ curl -sS -X POST http://localhost:3000/chunk/late \
 jq '.chunks[] | {text, vector: .embedding}' chunks.json | head
 ```
 
-### MCP
+### From an agent (MCP)
 
-> *Chunk this whitepaper with `chunk_late` so I can stash the embeddings in my vector DB.*
-
-The LLM client calls the tool and hands the structured result back for the agent to pipe wherever it needs.
+Agents can call `chunk_late` directly once the toolkit is registered as an MCP tool source (see [README](../../README.md#use-it-from-an-agent)). A typical pipeline: `convert_url` → `chunk_late` → upsert each chunk's `{text, embedding}` pair into a vector store. The embeddings come back in the tool result; no per-framework glue needed to access them.
 
 ## Notes & caveats
 

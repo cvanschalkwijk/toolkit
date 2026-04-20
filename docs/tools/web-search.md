@@ -79,11 +79,9 @@ curl -sS -X POST http://localhost:3000/web/search \
   -d '{"query":"nvidia earnings","categories":["news"],"time_range":"week"}'
 ```
 
-### MCP — from an agent
+### From an agent (MCP)
 
-> *Use the `web_search` tool to find Anthropic's announcement of Claude 4.7 and its pricing page.*
-
-The LLM calls `web_search`, inspects result URLs, and can chain `convert_url` on a promising hit.
+With the toolkit registered as an MCP tool source (see [README](../../README.md#use-it-from-an-agent)), `web_search` is the entry point of most discovery-driven pipelines. Natural continuation: pick promising result URLs from the tool result, pipe each into `convert_url` for clean markdown, then `chunk_semantic` + `extract_structured` to produce whatever structured briefing the downstream system expects. The agent chains these on its own — each is just another MCP tool.
 
 ## Running the backend
 

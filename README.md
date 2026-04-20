@@ -1,25 +1,23 @@
 # toolkit
 
-**HTTP + MCP utility API for LLM-efficient document tooling.**
+**Composable tools for LLM agents.** One TypeScript file per tool, lit up on two interfaces from the same source of truth.
 
-One service, two interfaces, one source of truth:
+- **HTTP** — Hono + OpenAPI, Swagger UI at `/`. Any language or script can hit the endpoints directly, no agent runtime required.
+- **MCP** — Model Context Protocol over HTTP/SSE at `/mcp`. Point any MCP-aware agent framework at the URL and every tool registers itself automatically — no per-tool glue code to write.
 
-- **HTTP** — Hono + OpenAPI, Swagger UI served at `/`. Any client that speaks HTTP can use it.
-- **MCP** — Model Context Protocol over HTTP/SSE at `/mcp`. Any MCP-aware LLM agent (Claude Desktop, Cursor, Continue.dev, …) can discover and call the same tools natively.
+Use it as a standalone utility API, wire it into an agent, or both. Adding a new tool is one file; the HTTP route, OpenAPI schema, and MCP registration all derive from that file.
 
-Adding a tool is a single TypeScript file; it lights up on both interfaces automatically.
+## Tools
 
-## Tools (v1)
-
-Each tool name links to its per-tool doc with full inputs, outputs, and examples.
+Each name links to a per-tool doc with inputs, outputs, and examples.
 
 | Category | Tools | Backend |
 |---|---|---|
+| **Web** | [`web_search`](docs/tools/web-search.md) | [SearXNG](https://github.com/searxng/searxng) metasearch (BYO instance or `docker compose --profile search up`) |
 | **Conversion** | [`convert_file`](docs/tools/convert-file.md), [`convert_url`](docs/tools/convert-url.md) | [markitdown](https://github.com/microsoft/markitdown) + [docling](https://github.com/docling-project/docling) (auto-routed by format) |
 | **Chunking** | [`chunk_semantic`](docs/tools/chunk-semantic.md), [`chunk_late`](docs/tools/chunk-late.md) | [sentence-transformers](https://www.sbert.net/) + LangChain `SemanticChunker`; [jina-embeddings-v3](https://huggingface.co/jinaai/jina-embeddings-v3) for true late-chunking |
 | **Sanitization** | [`sanitize_text`](docs/tools/sanitize-text.md) | [Microsoft Presidio](https://microsoft.github.io/presidio/) |
 | **Structured output** | [`extract_structured`](docs/tools/extract-structured.md) | [Instructor](https://python.useinstructor.com/) + any OpenAI-compatible endpoint |
-| **Web** | [`web_search`](docs/tools/web-search.md) | [SearXNG](https://github.com/searxng/searxng) metasearch (BYO instance or `docker compose --profile search up`) |
 
 ## Quickstart
 
@@ -37,7 +35,7 @@ export SEARXNG_SECRET=$(openssl rand -hex 32)    # or set it in .env
 docker compose --profile search up -d
 ```
 
-The SearXNG debug UI is reachable at <http://localhost:8080> (loopback-only by default).
+The SearXNG debug UI is at <http://localhost:8080> (loopback-only by default).
 
 Then:
 
@@ -45,38 +43,81 @@ Then:
 - OpenAPI spec: <http://localhost:3000/openapi.json>
 - MCP endpoint: `http://localhost:3000/mcp`
 
-## MCP client config
+## Direct HTTP usage
 
-### Claude Desktop
+Every tool is a plain POST endpoint. Call it from anything that speaks HTTP — shell scripts, cron jobs, Lambda functions, server code in any language. No agent runtime required.
 
-Append to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or the equivalent on your OS:
-
-```json
-{
-  "mcpServers": {
-    "toolkit": {
-      "url": "http://localhost:3000/mcp"
-    }
-  }
-}
+```bash
+curl -sS -X POST http://localhost:3000/web/search \
+  -H 'content-type: application/json' \
+  -d '{"query":"3D printed sustainable housing breakthroughs","max_results":5}'
 ```
 
-If your Claude Desktop version doesn't accept bare SSE URLs, use the [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) bridge:
+Swagger UI at `/` shows every endpoint and lets you "Try it out" inline. See each tool's doc for shell + language examples.
 
-```json
-{
-  "mcpServers": {
-    "toolkit": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "http://localhost:3000/mcp"]
-    }
-  }
-}
+## Use it from an agent
+
+### Mastra (TypeScript)
+
+[Mastra](https://mastra.ai/) treats MCP as a first-class citizen — point its `MCPClient` at the toolkit URL and every tool is available to the agent with no per-tool wiring:
+
+```ts
+import { Agent } from '@mastra/core/agent'
+import { MCPClient } from '@mastra/mcp'
+
+const toolkit = new MCPClient({ url: 'http://localhost:3000/mcp' })
+
+export const researcher = new Agent({
+  id: 'research-librarian',
+  name: 'Librarian',
+  model: 'openai/gpt-4o', // or a local model served via OpenAI-compatible endpoint
+  instructions: `
+    You turn a broad topic into a structured research briefing.
+
+    1. Use web_search to find the three most authoritative sources on the topic.
+    2. For each source, convert it to clean markdown with convert_url
+       (for articles and PDFs) or convert_file (for uploaded bytes).
+    3. Strip PII from every source with sanitize_text before further processing.
+    4. Break the combined text into thematic chunks with chunk_semantic so
+       you can reason over sections without blowing the context window.
+    5. Return a final structured JSON briefing with extract_structured.
+  `,
+  tools: await toolkit.getTools(),
+})
 ```
 
-### Cursor
+### Any MCP-aware client
 
-Settings → MCP → Add new MCP Server. URL: `http://localhost:3000/mcp`.
+The endpoint is just a URL:
+
+```
+http://localhost:3000/mcp
+```
+
+Works with Mastra, the OpenAI Agents SDK, LangGraph's MCP adapter, [`mcp-remote`](https://www.npmjs.com/package/mcp-remote), `ai` SDK, or anything else that speaks MCP over HTTP/SSE. The same tool registry, same input/output schemas, same behavior as the HTTP surface.
+
+## Showcase: the Digital Research Librarian
+
+A concrete multi-step agent that exercises every category in the toolkit. Given a topic — say, *"The latest breakthroughs in 3D-printed sustainable housing"* — it produces a clean, structured JSON briefing by chaining the tools into a refinery pipeline:
+
+1. **Discover** (`web_search`) — find three authoritative sources (a whitepaper PDF, a technical news article, a video).
+2. **Ingest** (`convert_url`) — fetch and convert each source to clean markdown; docling handles the PDF's tables and headings, markitdown the HTML article.
+3. **Sanitize** (`sanitize_text`) — strip researcher emails, incidental PII, anything identifying before the content enters the downstream steps.
+4. **Chunk** (`chunk_semantic`) — split the combined markdown into thematic sections ("Materials Science," "Architectural Efficiency," "Cost Analysis") so the LLM reasons over each without context bloat.
+5. **Extract** (`extract_structured`) — produce a JSON research card that a database or downstream pipeline can consume:
+
+   ```json
+   {
+     "topic": "3D-Printed Sustainable Housing",
+     "key_innovations": ["Bio-polymer ink", "Robot-arm precision"],
+     "primary_experts": ["Dr. Aris", "Team Terra"],
+     "summary": "A 500-word executive brief..."
+   }
+   ```
+
+Each step is one tool call. The agent (Mastra snippet above) orchestrates them based on its instructions. No custom Python, no glue code — the toolkit's tools + an LLM are the whole stack.
+
+This pattern generalizes: swap search → ingest → sanitize → chunk → extract for any refinery workflow (competitive intel, regulatory filings, scientific papers, interview transcripts, …). The building blocks stay the same.
 
 ## Adding a tool
 
@@ -91,10 +132,7 @@ Both the HTTP route and the MCP tool appear automatically on next start.
 
 ## Deployment
 
-The repo is hostname-agnostic: any HTTPS reverse proxy that can route to
-the `api` container works. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
-for a worked example (Caddy + Tailscale + Cloudflare DNS-01); Traefik,
-Nginx, a Cloudflare Tunnel, or `ngrok` all work equally well.
+The repo is hostname-agnostic: any HTTPS reverse proxy that can route to the `api` container works. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for a worked example (Caddy + Tailscale + Cloudflare DNS-01); Traefik, Nginx, a Cloudflare Tunnel, or `ngrok` all work equally well.
 
 ## License
 

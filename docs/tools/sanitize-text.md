@@ -99,11 +99,9 @@ CLEAN=$(curl -sS -X POST http://localhost:3000/sanitize/text \
 # Now it's safe to hit OpenAI / Anthropic / etc. with CLEAN.
 ```
 
-### MCP
+### From an agent (MCP)
 
-> *Before you send this user message to GPT-4o, sanitize it with `sanitize_text` using replace mode, then use the sanitized version in the prompt.*
-
-The agent chains the call automatically.
+Register the toolkit URL with any MCP-aware agent framework (see [README](../../README.md#use-it-from-an-agent)) and `sanitize_text` becomes an available tool. A common pattern is slotting it as a guard step in a refinery pipeline — e.g., `convert_url` → `sanitize_text` → `chunk_semantic` — so PII never reaches downstream LLM calls or vector-store writes. The scrubbed text comes back as the tool result; the agent continues the workflow with that instead of the raw input.
 
 ## Notes & caveats
 

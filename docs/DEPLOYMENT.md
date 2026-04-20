@@ -95,39 +95,25 @@ Prereqs:
 - Caddy built with the `caddy-dns/cloudflare` module (standard docker image
   doesn't include it; build with `xcaddy build --with github.com/caddy-dns/cloudflare`)
 
-## MCP client configuration
+## Wiring agents to the deployed endpoint
 
-Once the service is reachable at a URL:
+Once the service is reachable at `https://toolkit.<your-domain>`, the MCP URL is:
 
-### Claude Desktop
-
-```json
-{
-  "mcpServers": {
-    "toolkit": {
-      "url": "https://toolkit.<your-domain>/mcp"
-    }
-  }
-}
+```
+https://toolkit.<your-domain>/mcp
 ```
 
-If Claude Desktop's version rejects direct SSE URLs, use the
-[`mcp-remote`](https://www.npmjs.com/package/mcp-remote) shim:
+### Mastra (TypeScript)
 
-```json
-{
-  "mcpServers": {
-    "toolkit": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://toolkit.<your-domain>/mcp"]
-    }
-  }
-}
+```ts
+import { MCPClient } from '@mastra/mcp'
+const toolkit = new MCPClient({ url: 'https://toolkit.<your-domain>/mcp' })
+// toolkit.getTools() → every tool in the registry, typed and ready
 ```
 
-### Cursor
+### Any MCP client
 
-Settings → MCP → Add New MCP Server. URL: `https://toolkit.<your-domain>/mcp`.
+Any framework or client that speaks the MCP HTTP/SSE protocol can use the same URL — Mastra, the OpenAI Agents SDK, LangGraph's MCP adapter, the `ai` SDK's MCP integration, [`mcp-remote`](https://www.npmjs.com/package/mcp-remote), or IDE clients that support remote MCP. Configuration shape varies by client; the URL is the only toolkit-specific piece.
 
 ## Env vars
 

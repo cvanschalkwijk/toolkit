@@ -160,11 +160,9 @@ curl -sS -X POST http://localhost:3000/extract/structured \
   }' | jq '.data'
 ```
 
-### MCP — agent-driven extraction
+### From an agent (MCP)
 
-> *Use `extract_structured` to pull a list of action items from these meeting notes. Use a flat schema: `owner`, `task`, `due_date`, one object per action item in an array.*
-
-The agent calls the tool, gets back `data.action_items` (or whatever you named the array), and iterates.
+With the toolkit registered as an MCP tool source (see [README](../../README.md#use-it-from-an-agent)), `extract_structured` becomes the final stage of most refinery pipelines. Typical chain: `web_search` or `convert_url` → `sanitize_text` → `chunk_semantic` → `extract_structured`, where the last call produces the JSON object the downstream system expects (a database row, an API payload, a research card, …). The agent passes the schema + text; the tool hands back structured `data` ready for whatever consumes it next.
 
 ## Notes & caveats
 

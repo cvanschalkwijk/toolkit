@@ -81,11 +81,9 @@ curl -sS -X POST http://localhost:3000/chunk/semantic \
   | jq '.count'
 ```
 
-### MCP
+### From an agent (MCP)
 
-> *Chunk this long article semantically so I can summarise it section-by-section.*
-
-The agent calls `chunk_semantic`, gets back the list, and can iterate over chunks as separate thoughts.
+Wire the toolkit into any MCP-aware agent framework (see [README](../../README.md#use-it-from-an-agent)) and `chunk_semantic` shows up alongside every other tool. Natural fit for refinery pipelines — e.g., `convert_url` → `chunk_semantic` → per-chunk reasoning / summarisation / `extract_structured`. The `chunks` array comes back as the tool result; the agent iterates through sections without ever putting the full source in its own context.
 
 ## Notes & caveats
 

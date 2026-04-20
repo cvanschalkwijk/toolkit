@@ -78,11 +78,9 @@ curl -sS -X POST http://localhost:3000/convert/url \
   | jq '.engine_used, .duration_ms'
 ```
 
-### MCP — from an agent
+### From an agent (MCP)
 
-> *Use the `convert_url` tool to grab the transcript from `https://www.youtube.com/watch?v=abc123` so you can summarize it.*
-
-The LLM calls `convert_url`, receives the Markdown as the tool result, and proceeds with the summary.
+With the toolkit registered as an MCP tool source (see [README](../../README.md#use-it-from-an-agent)), the agent picks `convert_url` on its own from instructions like *"grab the transcript from this YouTube URL and summarise it"*. The Markdown comes back as the tool result and flows into the next step — commonly a `chunk_semantic` + summarize pass, or a direct `extract_structured` call if the shape is known up front.
 
 ## Notes & caveats
 

@@ -69,13 +69,13 @@ curl -sS -X POST http://localhost:3000/convert/file \
   | jq '.engine_used, .format'
 ```
 
-### MCP — from an agent
+### From an agent (MCP)
 
-From Claude Desktop, Cursor, or any MCP client:
+Once the toolkit URL is registered with your agent framework (see [README](../../README.md#use-it-from-an-agent) for the Mastra snippet), an instruction like:
 
-> *Use the `convert_file` tool to convert `report.pdf` to markdown.*
+> *Convert `report.pdf` to markdown.*
 
-The agent base64-encodes the file on its side and calls `convert_file`. The Markdown is returned as the tool result; the agent then reasons over it in-context.
+… triggers a `convert_file` call. The agent base64-encodes the bytes on its side and hands the tool the file content; the Markdown comes back as the tool result and lands in-context for whatever the agent does next (summarize, chunk, extract, …).
 
 ## Notes & caveats
 
