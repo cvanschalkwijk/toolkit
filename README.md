@@ -21,6 +21,8 @@ Each name links to a per-tool doc with inputs, outputs, and examples.
 | [`sanitize_text`](docs/tools/sanitize-text.md) | [Microsoft Presidio](https://microsoft.github.io/presidio/) — PII detection + redaction. |
 | [`extract_structured`](docs/tools/extract-structured.md) | [Instructor](https://python.useinstructor.com/) + any OpenAI-compatible LLM endpoint. |
 | [`rerank`](docs/tools/rerank.md) | Cohere-compatible cross-encoder reranker ([Infinity](https://github.com/michaelfeil/infinity) / HF TEI). Recommended model: [`BAAI/bge-reranker-v2-m3`](https://huggingface.co/BAAI/bge-reranker-v2-m3). |
+| [`classify_domain`](docs/tools/classify-domain.md) | Fixed-taxonomy sequence classifier. Recommended model: [`argilla/ModernBERT-domain-classifier`](https://huggingface.co/argilla/ModernBERT-domain-classifier) (26 domains). |
+| [`detect_intent`](docs/tools/detect-intent.md) | Zero-shot span / intent / entity extractor via [GLiNER](https://github.com/urchade/GLiNER). Caller supplies label names per call. Recommended model: [`knowledgator/modern-gliner-bi-large-v1.0`](https://huggingface.co/knowledgator/modern-gliner-bi-large-v1.0). |
 
 ## Quickstart
 
