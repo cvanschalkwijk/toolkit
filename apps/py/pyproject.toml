@@ -21,6 +21,11 @@ convert = [
 ]
 chunk = [
   "sentence-transformers>=3.3",
+  # jina-embeddings-v3's trust_remote_code path sets `_tied_weights_keys`
+  # (list) on XLMRobertaLoRA; transformers 4.47 renamed the contract to
+  # `all_tied_weights_keys` (dict) during weight tying. Until jina pushes
+  # updated remote code, pin below the breakpoint.
+  "transformers>=4.40,<4.47",
   "langchain-text-splitters>=0.3",
   "langchain-experimental>=0.3",
   "langchain-community>=0.3",
