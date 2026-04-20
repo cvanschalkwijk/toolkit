@@ -34,6 +34,7 @@ Search the public web via a self-hosted [SearXNG](https://github.com/searxng/sea
 | `safesearch` | int 0–2 | no | `1` | 0 = off, 1 = moderate, 2 = strict. |
 | `pageno` | int 1–10 | no | `1` | Result page number. |
 | `max_results` | int 1–50 | no | `10` | Upper bound on returned results after SearXNG dedupe. |
+| `rerank` | `auto \| on \| off` | no | `auto` | `auto`: rerank if `RERANKER_URL` is configured; otherwise return SearXNG's native order. `on`: require rerank and error if not configured. `off`: skip rerank even when configured. |
 
 ## Output
 
@@ -48,17 +49,21 @@ Search the public web via a self-hosted [SearXNG](https://github.com/searxng/sea
       "engine": "duckduckgo",
       "score": 1.0,
       "published_date": "2026-03-15",
-      "category": "general"
+      "category": "general",
+      "rerank_score": 0.94
     }
   ],
   "suggestions": ["claude 4.7 api", "claude opus pricing"],
   "answers": [],
   "infoboxes": [],
+  "reranker_used": true,
   "duration_ms": 812
 }
 ```
 
 `suggestions`, `answers`, and `infoboxes` are often empty; they're passed through when SearXNG returns them.
+
+`reranker_used` tells the caller whether cross-encoder reranking happened on this call (`RERANKER_URL` set, `rerank` mode didn't disable it, and there was more than one candidate to sort). When true, each result gets a `rerank_score` in `[0, 1]` and the array is sorted by that score. When false, results stay in SearXNG's native merged order and `rerank_score` is omitted. See [`rerank`](rerank.md) for the standalone tool that exposes the same backend for arbitrary documents.
 
 ## Examples
 

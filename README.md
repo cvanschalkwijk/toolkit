@@ -18,6 +18,7 @@ Each name links to a per-tool doc with inputs, outputs, and examples.
 | **Chunking** | [`chunk_semantic`](docs/tools/chunk-semantic.md), [`chunk_late`](docs/tools/chunk-late.md) | [sentence-transformers](https://www.sbert.net/) + LangChain `SemanticChunker`; [jina-embeddings-v3](https://huggingface.co/jinaai/jina-embeddings-v3) for true late-chunking |
 | **Sanitization** | [`sanitize_text`](docs/tools/sanitize-text.md) | [Microsoft Presidio](https://microsoft.github.io/presidio/) |
 | **Structured output** | [`extract_structured`](docs/tools/extract-structured.md) | [Instructor](https://python.useinstructor.com/) + any OpenAI-compatible endpoint |
+| **Reranking** | [`rerank`](docs/tools/rerank.md) | Cross-encoder via [Infinity](https://github.com/michaelfeil/infinity) or HF TEI. Recommended model: [`BAAI/bge-reranker-v2-m3`](https://huggingface.co/BAAI/bge-reranker-v2-m3). `web_search` auto-reranks when `RERANKER_URL` is set |
 
 ## Quickstart
 
