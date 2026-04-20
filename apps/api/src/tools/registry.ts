@@ -3,6 +3,7 @@ import { chunkLateTool, chunkSemanticTool } from './chunk'
 import { convertFileTool, convertUrlTool } from './convert'
 import { extractStructuredTool } from './extract'
 import { pingTool } from './ping'
+import { rerankTool } from './rerank'
 import { sanitizeTextTool } from './sanitize'
 import { webSearchTool } from './web'
 
@@ -21,4 +22,5 @@ export const tools: StoredTool[] = [
   toStored(sanitizeTextTool),
   toStored(extractStructuredTool),
   toStored(webSearchTool),
+  toStored(rerankTool),
 ]
