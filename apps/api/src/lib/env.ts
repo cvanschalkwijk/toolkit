@@ -30,6 +30,32 @@ const schema = z.object({
   // if your backend is serving a different cross-encoder.
   // See https://huggingface.co/BAAI/bge-reranker-v2-m3 for the model card.
   RERANKER_MODEL: z.string().default('BAAI/bge-reranker-v2-m3'),
+  // Domain-classifier service (sequence-classification text→labels).
+  // When set, the classify_domain tool becomes usable. Expects a POST
+  // /classify endpoint returning {results: [[{label, score}, ...]]}.
+  // Works with the bundled classifier-service in bitdream's inference
+  // stack (argilla/ModernBERT-domain-classifier) or any HF pipeline
+  // wrapper that matches the shape.
+  CLASSIFIER_URL: z
+    .string()
+    .url()
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => v || undefined),
+  CLASSIFIER_MODEL: z.string().default('argilla/ModernBERT-domain-classifier'),
+  // GLiNER zero-shot span extraction service. When set, the detect_intent
+  // tool becomes usable. Expects POST /predict returning
+  // {entities: [{start, end, text, label, score}]}.
+  // Works with the bundled gliner-service
+  // (knowledgator/modern-gliner-bi-large-v1.0) or any FastAPI wrapper
+  // that follows the same shape.
+  GLINER_URL: z
+    .string()
+    .url()
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => v || undefined),
+  GLINER_MODEL: z.string().default('knowledgator/modern-gliner-bi-large-v1.0'),
   // LLM backend only required by the extract_structured tool; empty is OK.
   LLM_BASE_URL: z
     .string()
