@@ -4,6 +4,7 @@ import { convertFileTool, convertUrlTool } from './convert'
 import { extractStructuredTool } from './extract'
 import { pingTool } from './ping'
 import { sanitizeTextTool } from './sanitize'
+import { webSearchTool } from './web'
 
 /**
  * The canonical list of tools exposed over HTTP and MCP. To add a tool:
@@ -19,4 +20,5 @@ export const tools: StoredTool[] = [
   toStored(chunkLateTool),
   toStored(sanitizeTextTool),
   toStored(extractStructuredTool),
+  toStored(webSearchTool),
 ]

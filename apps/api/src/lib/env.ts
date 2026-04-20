@@ -5,6 +5,9 @@ const schema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   PY_URL: z.string().url().default('http://py:8000'),
+  // SearXNG metasearch instance used by the web_search tool. Default points at
+  // the bundled docker-compose `searxng` service; override for BYO instances.
+  SEARXNG_URL: z.string().url().default('http://searxng:8080'),
   // LLM backend only required by the extract_structured tool; empty is OK.
   LLM_BASE_URL: z
     .string()
