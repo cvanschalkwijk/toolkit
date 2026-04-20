@@ -17,9 +17,13 @@ services:
       - API_HOST=0.0.0.0
       - API_PORT=3000
       - PY_URL=http://py:8000
+      - SEARXNG_URL=${SEARXNG_URL:-http://searxng:8080}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       # NOTE: LLM_* env vars live on `py` below, not here — the extract
       # tool's LLM call path runs inside the Python sidecar.
+      # SEARXNG_URL targets the `searxng` service (profile: search) by
+      # default; point it at any other instance if you don't want the
+      # bundled one.
     depends_on:
       py:
         condition: service_healthy
@@ -57,6 +61,40 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+  searxng:
+    # Bundled metasearch backend for the `web_search` tool. Gated behind the
+    # `search` profile so `docker compose up -d` without `--profile search`
+    # does not pull this image or take the port. Bring it up with:
+    #   docker compose --profile search up -d
+    # or point SEARXNG_URL at your own instance and skip the profile.
+    image: searxng/searxng:latest@sha256:95c1173a35607ad354aabb4a25b1c5bd81bfb4c2c862773a37714cc247b42e80
+    container_name: toolkit-searxng
+    profiles: ["search"]
+    restart: unless-stopped
+    environment:
+      # SearXNG reads SEARXNG_SECRET at boot and substitutes it into
+      # server.secret_key. Generate with `openssl rand -hex 32`. Required.
+      - SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET must be set when using --profile search}
+      - SEARXNG_BASE_URL=http://searxng:8080/
+    volumes:
+      # Checked-in minimal config. Enables the JSON API (off by default in
+      # SearXNG) and narrows enabled engines to the reliable trio.
+      - ./searxng:/etc/searxng:rw
+    # Host-side publish is loopback-only so the debug UI + /stats are
+    # reachable from the docker host without leaking to the LAN. Override
+    # SEARXNG_BIND (e.g. 100.x.x.x:8080 for tailnet access) if you want
+    # remote access.
+    ports:
+      - "${SEARXNG_BIND:-127.0.0.1:8080}:8080"
+    networks:
+      - toolkit-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 networks:
   toolkit-net:

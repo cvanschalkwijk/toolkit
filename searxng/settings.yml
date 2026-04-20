@@ -1,0 +1,90 @@
+# SearXNG settings — toolkit bundled instance.
+#
+# The container serves this file via the ./searxng:/etc/searxng bind mount
+# (see docker-compose.yml). SearXNG layers its own full default settings
+# beneath these keys via `use_default_settings`.
+#
+# NOTE: the SearXNG entrypoint chowns this directory to its internal uid
+# (977) on first boot. If you edit the file afterwards from the host, run
+# `sudo chown -R $USER:$USER searxng/` first. The file contents aren't
+# rewritten — only the ownership is changed.
+
+# `keep_only` trims the upstream default engine list to this curated set.
+# Declaring engines below only *adjusts* defaults, never removes them, so
+# without keep_only google/bing/startpage/etc. stay enabled and get blocked
+# in practice. keep_only is SearXNG's documented way to whitelist.
+#
+# The curated engine set spans:
+#   - 6 general-web indexes (ddg, brave, mojeek, qwant, google, bing)
+#   - 1 long-form/text-focused niche index (marginalia)
+#   - 2 reference engines that populate infoboxes/answers (wikipedia, wikidata)
+#   - 2 tech/code engines for programming queries (stackoverflow, github)
+#
+# Google and Bing aggressively rate-limit scraped traffic — expect
+# intermittent 429s from both. SearXNG silently drops any engine that
+# rate-limits from the merged result set, so queries still succeed with
+# whatever survived. The other engines rarely block. None require API
+# keys, though supplying BRAVE_SEARCH_API_KEY via a `braveapi` engine
+# override would eliminate brave's scrape rate-limit (free 2k/mo tier).
+use_default_settings:
+  engines:
+    keep_only:
+      - duckduckgo
+      - brave
+      - mojeek
+      - qwant
+      - marginalia
+      - wikipedia
+      - wikidata
+      - stackoverflow
+      - github
+      - google
+      - bing
+
+general:
+  instance_name: "toolkit"
+  # The instance is backend-only by default — don't advertise donation links.
+  donation_url: false
+  contact_url: false
+
+server:
+  # Overridden at runtime by SEARXNG_SECRET (docker-compose env). This literal
+  # must exist so the file is valid YAML on first load.
+  secret_key: "CHANGE_ME"
+  # Only the api container + (optionally) a local operator browser talk to
+  # this instance. No point rate-limiting ourselves.
+  limiter: false
+  image_proxy: false
+
+search:
+  # JSON API is disabled by default in SearXNG. Enabling it here is what
+  # makes the `web_search` tool work at all — without this line every call
+  # returns 403.
+  formats:
+    - html
+    - json
+  safe_search: 1
+
+outgoing:
+  # Per-engine timeout so one slow engine doesn't stall the merged result.
+  request_timeout: 3.0
+  # Hard ceiling across retries.
+  max_request_timeout: 10.0
+  pool_connections: 100
+  pool_maxsize: 20
+
+# `keep_only` above narrows the engine set but doesn't override per-engine
+# `disabled: true` from upstream defaults. Several engines we want
+# (mojeek, marginalia, stackoverflow, github) ship disabled by default, so
+# we explicitly flip them on. The `engine:` field inherits from defaults
+# — we just need `name` + `disabled: false` per entry. google, bing,
+# duckduckgo, brave, qwant, wikipedia, wikidata are enabled by default.
+engines:
+  - name: mojeek
+    disabled: false
+  - name: marginalia
+    disabled: false
+  - name: stackoverflow
+    disabled: false
+  - name: github
+    disabled: false
