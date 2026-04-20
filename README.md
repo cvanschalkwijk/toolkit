@@ -11,14 +11,16 @@ Use it as a standalone utility API, wire it into an agent, or both. Adding a new
 
 Each name links to a per-tool doc with inputs, outputs, and examples.
 
-| Category | Tools | Backend |
-|---|---|---|
-| **Web** | [`web_search`](docs/tools/web-search.md) | [SearXNG](https://github.com/searxng/searxng) metasearch (BYO instance or `docker compose --profile search up`) |
-| **Conversion** | [`convert_file`](docs/tools/convert-file.md), [`convert_url`](docs/tools/convert-url.md) | [markitdown](https://github.com/microsoft/markitdown) + [docling](https://github.com/docling-project/docling) (auto-routed by format); optional [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) fetcher for CF-walled URLs |
-| **Chunking** | [`chunk_semantic`](docs/tools/chunk-semantic.md), [`chunk_late`](docs/tools/chunk-late.md) | [sentence-transformers](https://www.sbert.net/) + LangChain `SemanticChunker`; [jina-embeddings-v3](https://huggingface.co/jinaai/jina-embeddings-v3) for true late-chunking |
-| **Sanitization** | [`sanitize_text`](docs/tools/sanitize-text.md) | [Microsoft Presidio](https://microsoft.github.io/presidio/) |
-| **Structured output** | [`extract_structured`](docs/tools/extract-structured.md) | [Instructor](https://python.useinstructor.com/) + any OpenAI-compatible endpoint |
-| **Reranking** | [`rerank`](docs/tools/rerank.md) | Cross-encoder via [Infinity](https://github.com/michaelfeil/infinity) or HF TEI. Recommended model: [`BAAI/bge-reranker-v2-m3`](https://huggingface.co/BAAI/bge-reranker-v2-m3). `web_search` auto-reranks when `RERANKER_URL` is set |
+| Tool | Backend |
+|---|---|
+| [`web_search`](docs/tools/web-search.md) | [SearXNG](https://github.com/searxng/searxng) metasearch (BYO instance or `docker compose --profile search up`). Auto-reranks when `RERANKER_URL` is set. |
+| [`convert_file`](docs/tools/convert-file.md) | [markitdown](https://github.com/microsoft/markitdown) + [docling](https://github.com/docling-project/docling), auto-routed by format. |
+| [`convert_url`](docs/tools/convert-url.md) | Same engines as `convert_file`, plus optional [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) fetcher for Cloudflare / WAF-walled URLs. |
+| [`chunk_semantic`](docs/tools/chunk-semantic.md) | [sentence-transformers](https://www.sbert.net/) + LangChain's `SemanticChunker`. |
+| [`chunk_late`](docs/tools/chunk-late.md) | [jina-embeddings-v3](https://huggingface.co/jinaai/jina-embeddings-v3) for true late-chunking — document-wide context preserved in every chunk's embedding. |
+| [`sanitize_text`](docs/tools/sanitize-text.md) | [Microsoft Presidio](https://microsoft.github.io/presidio/) — PII detection + redaction. |
+| [`extract_structured`](docs/tools/extract-structured.md) | [Instructor](https://python.useinstructor.com/) + any OpenAI-compatible LLM endpoint. |
+| [`rerank`](docs/tools/rerank.md) | Cohere-compatible cross-encoder reranker ([Infinity](https://github.com/michaelfeil/infinity) / HF TEI). Recommended model: [`BAAI/bge-reranker-v2-m3`](https://huggingface.co/BAAI/bge-reranker-v2-m3). |
 
 ## Quickstart
 
