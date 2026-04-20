@@ -35,10 +35,13 @@ def test_markitdown_roundtrips_html(sample_html: bytes) -> None:
     assert result["source"] == {"filename": "sample.html", "bytes": len(sample_html)}
     assert result["duration_ms"] >= 0
 
-    # The HTML fixture has these strings — any conversion engine should preserve them.
+    # The HTML fixture has these strings — any conversion engine should
+    # preserve them. Strip markdown backslash-escapes (markitdown escapes
+    # `_` in table cells as `\_`) before substring checks.
+    md_unescaped = md.replace("\\_", "_")
     assert "Introduction to Toolkit" in md
     assert "Chunking" in md
-    assert "chunk_semantic" in md
+    assert "chunk_semantic" in md_unescaped
     # At least one list item survived.
     assert "Document conversion" in md or "document conversion" in md.lower()
 

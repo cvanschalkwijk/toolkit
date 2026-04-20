@@ -61,7 +61,13 @@ packages = ["src/toolkit_py"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-# Unset so markers don't error when a test uses a category without it installed.
+# Hide deprecation spam from transitive deps so real failures stay visible.
 filterwarnings = [
   "ignore::DeprecationWarning",
+]
+# Skip `@pytest.mark.slow` tests by default (live network calls, large
+# model downloads, etc.). Run them explicitly with `pytest -m slow`.
+addopts = "-m 'not slow'"
+markers = [
+  "slow: tests that make live network calls or take noticeable time",
 ]

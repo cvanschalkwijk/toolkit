@@ -50,11 +50,14 @@ def _markitdown_from_bytes(content: bytes, filename: str) -> str:
     md = _markitdown()
     stream = io.BytesIO(content)
     ext = _ext(filename)
-    kwargs = {"stream_info": {"extension": f".{ext}"}} if ext else {}
     try:
-        result = md.convert_stream(stream, **kwargs)  # type: ignore[arg-type]
-    except TypeError:
-        # Older markitdown: signature took file_extension= positionally.
+        from markitdown import StreamInfo
+
+        kwargs = {"stream_info": StreamInfo(extension=f".{ext}")} if ext else {}
+        result = md.convert_stream(stream, **kwargs)
+    except (ImportError, TypeError):
+        # Older markitdown: no StreamInfo export, signature took
+        # file_extension= positionally.
         stream.seek(0)
         result = md.convert_stream(stream, file_extension=f".{ext}" if ext else None)
     return str(result.text_content)
