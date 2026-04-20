@@ -14,7 +14,7 @@ Each name links to a per-tool doc with inputs, outputs, and examples.
 | Category | Tools | Backend |
 |---|---|---|
 | **Web** | [`web_search`](docs/tools/web-search.md) | [SearXNG](https://github.com/searxng/searxng) metasearch (BYO instance or `docker compose --profile search up`) |
-| **Conversion** | [`convert_file`](docs/tools/convert-file.md), [`convert_url`](docs/tools/convert-url.md) | [markitdown](https://github.com/microsoft/markitdown) + [docling](https://github.com/docling-project/docling) (auto-routed by format) |
+| **Conversion** | [`convert_file`](docs/tools/convert-file.md), [`convert_url`](docs/tools/convert-url.md) | [markitdown](https://github.com/microsoft/markitdown) + [docling](https://github.com/docling-project/docling) (auto-routed by format); optional [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) fetcher for CF-walled URLs |
 | **Chunking** | [`chunk_semantic`](docs/tools/chunk-semantic.md), [`chunk_late`](docs/tools/chunk-late.md) | [sentence-transformers](https://www.sbert.net/) + LangChain `SemanticChunker`; [jina-embeddings-v3](https://huggingface.co/jinaai/jina-embeddings-v3) for true late-chunking |
 | **Sanitization** | [`sanitize_text`](docs/tools/sanitize-text.md) | [Microsoft Presidio](https://microsoft.github.io/presidio/) |
 | **Structured output** | [`extract_structured`](docs/tools/extract-structured.md) | [Instructor](https://python.useinstructor.com/) + any OpenAI-compatible endpoint |
@@ -28,14 +28,22 @@ cp .env.example .env      # edit LLM_* vars if you want extract_structured
 docker compose up -d
 ```
 
-To also bring up the bundled SearXNG backend for `web_search`:
+Two optional compose profiles add backends used by specific tools:
 
 ```bash
+# SearXNG metasearch backend for `web_search`:
 export SEARXNG_SECRET=$(openssl rand -hex 32)    # or set it in .env
 docker compose --profile search up -d
+
+# FlareSolverr (headful Chromium) so `convert_url` with
+# fetcher="stealth" can get past Cloudflare / WAF challenges:
+docker compose --profile stealth up -d
+
+# Both together:
+docker compose --profile search --profile stealth up -d
 ```
 
-The SearXNG debug UI is at <http://localhost:8080> (loopback-only by default).
+SearXNG's debug UI is at <http://localhost:8080>; FlareSolverr's API is at <http://127.0.0.1:8191/v1>. Both bind loopback-only by default.
 
 Then:
 
@@ -101,7 +109,7 @@ Works with Mastra, the OpenAI Agents SDK, LangGraph's MCP adapter, [`mcp-remote`
 A concrete multi-step agent that exercises every category in the toolkit. Given a topic — say, *"The latest breakthroughs in 3D-printed sustainable housing"* — it produces a clean, structured JSON briefing by chaining the tools into a refinery pipeline:
 
 1. **Discover** (`web_search`) — find three authoritative sources (a whitepaper PDF, a technical news article, a video).
-2. **Ingest** (`convert_url`) — fetch and convert each source to clean markdown; docling handles the PDF's tables and headings, markitdown the HTML article.
+2. **Ingest** (`convert_url`) — fetch and convert each source to clean markdown; docling handles the PDF's tables and headings, markitdown the HTML article. When a site returns a Cloudflare challenge instead of content, the agent retries with `fetcher: "stealth"` and FlareSolverr drives a real browser through the challenge.
 3. **Sanitize** (`sanitize_text`) — strip researcher emails, incidental PII, anything identifying before the content enters the downstream steps.
 4. **Chunk** (`chunk_semantic`) — split the combined markdown into thematic sections ("Materials Science," "Architectural Efficiency," "Cost Analysis") so the LLM reasons over each without context bloat.
 5. **Extract** (`extract_structured`) — produce a JSON research card that a database or downstream pipeline can consume:
