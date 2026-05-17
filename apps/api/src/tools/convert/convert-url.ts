@@ -41,10 +41,15 @@ export const convertUrlTool = defineTool({
       source: z.object({ url: z.string() }),
       duration_ms: z.number().int(),
       extraction_tier: z
-        .enum(['trafilatura_precision', 'trafilatura_recall', 'markitdown_fallback'])
+        .enum([
+          'trafilatura_precision',
+          'trafilatura_recall',
+          'markitdown_fallback',
+          'empty_all_engines',
+        ])
         .optional()
         .describe(
-          'For engine="trafilatura": which extraction pass produced the markdown. `markitdown_fallback` means both trafilatura passes failed — downstream callers should treat the markdown as dirty (chrome included) and may want to re-extract from body_html via an LLM.',
+          'For engine="trafilatura": which extraction pass produced the markdown. `markitdown_fallback` means both trafilatura passes failed — downstream callers should treat the markdown as dirty (chrome included) and may want to re-extract from body_html via an LLM. `empty_all_engines` means EVERY pass came up empty (likely a JS-rendered SPA, paywall splash, or tracker pixel); `markdown` will be the empty string and callers should either run LLM recovery against `body_html` or retry with fetcher="stealth" to route through FlareSolverr.',
         ),
       body_html: z
         .string()

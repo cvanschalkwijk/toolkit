@@ -230,11 +230,18 @@ def _trafilatura_from_url(url: str, include_body_html: bool = False) -> tuple[st
     # to markitdown's whole-page transcription so we have *something*
     # cached.
     fallback = _markitdown_from_url(url)
-    if not fallback:
-        raise RuntimeError(
-            f"both trafilatura passes and markitdown fallback came up empty for {url}"
-        )
-    return fallback, {**base_meta, "extraction_tier": "markitdown_fallback"}
+    if fallback:
+        return fallback, {**base_meta, "extraction_tier": "markitdown_fallback"}
+
+    # Even markitdown came up empty (JS-rendered SPA, paywall splash,
+    # 1×1 tracker pixel, etc.). Don't 500 here — return the raw
+    # body_html (when the caller asked for it) with an
+    # `empty_all_engines` tier so downstream consumers can attempt
+    # LLM-based recovery against the raw HTML, or fall back to
+    # fetcher='stealth' for a JS-rendered render. Throwing would
+    # discard the page entirely and lose the body_html we already
+    # fetched.
+    return "", {**base_meta, "extraction_tier": "empty_all_engines"}
 
 
 def _trafilatura_from_html_bytes(
@@ -257,11 +264,14 @@ def _trafilatura_from_html_bytes(
         return text, {**base_meta, "extraction_tier": tier}
 
     fallback = _markitdown_from_bytes(content, "page.html")
-    if not fallback:
-        raise RuntimeError(
-            "both trafilatura passes and markitdown fallback came up empty on the stealth-fetched HTML"
-        )
-    return fallback, {**base_meta, "extraction_tier": "markitdown_fallback"}
+    if fallback:
+        return fallback, {**base_meta, "extraction_tier": "markitdown_fallback"}
+
+    # All engines empty on the stealth-fetched HTML too. Same
+    # treatment as the direct path: surface `empty_all_engines` with
+    # body_html so the caller can attempt LLM recovery instead of
+    # losing the page entirely.
+    return "", {**base_meta, "extraction_tier": "empty_all_engines"}
 
 
 # --- docling -----------------------------------------------------------------
