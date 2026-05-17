@@ -106,19 +106,77 @@ def _trafilatura_extract_metadata(downloaded: str | None | bytes) -> dict:
     }
 
 
+# Minimum markdown length we'll accept as "looks like a real article."
+# Trafilatura's `favor_precision=True` is known to misfire on some
+# Motley Fool / business-news templates where the wrapper enclosing
+# the article body doesn't match its scoring heuristic — it then
+# extracts a short fragment like the byline or author-bio block (~200
+# chars) and considers it the article. A 400-char floor catches these:
+# real article bodies are essentially never shorter than that for the
+# financial-news sources we care about. Tune up if it stops catching
+# the bad cases; tune down if it starts dropping legit short news
+# blurbs.
+_TRAFILATURA_MIN_OUTPUT = 400
+
+
+def _trafilatura_extract_text(html: str) -> str | None:
+    """
+    Two-pass trafilatura extraction with a length-based fallback.
+
+    Pass 1 — `favor_precision=True`: aggressive dropping of borderline
+    content. Gives the cleanest output when it works.
+    Pass 2 — `favor_recall=True`: more inclusive. Tries when pass 1's
+    output looks suspiciously short (likely caught the bio block
+    instead of the body, etc.).
+
+    Returns None when both passes still produce something too short
+    to plausibly be an article — caller can then fall back to
+    markitdown (whole-page transcription).
+    """
+    import trafilatura
+
+    text = trafilatura.extract(
+        html,
+        output_format="markdown",
+        include_comments=False,
+        include_tables=True,
+        favor_precision=True,
+        with_metadata=False,
+    )
+    if text and len(text) >= _TRAFILATURA_MIN_OUTPUT:
+        return str(text)
+
+    # Pass 1 produced nothing usable. Retry with recall-favored
+    # settings; this picks up article bodies wrapped in unconventional
+    # divs that precision dismisses.
+    recall = trafilatura.extract(
+        html,
+        output_format="markdown",
+        include_comments=False,
+        include_tables=True,
+        favor_recall=True,
+        with_metadata=False,
+    )
+    if recall and len(recall) >= _TRAFILATURA_MIN_OUTPUT:
+        return str(recall)
+    return None
+
+
 def _trafilatura_from_url(url: str) -> tuple[str, dict]:
     """
     Fetch a URL and extract just the article body as markdown.
 
     Uses trafilatura's built-in fetcher (follows redirects, respects
-    basic robots.txt). For sites that hot-block scrapers, returns an
-    error — the caller can retry with `fetcher="stealth"` which routes
-    through FlareSolverr and feeds the rendered HTML to
+    basic robots.txt). For sites that hot-block scrapers, raises —
+    the caller can retry with `fetcher="stealth"` which routes through
+    FlareSolverr and feeds the rendered HTML to
     `_trafilatura_from_html_bytes`.
 
-    `favor_precision=True` biases toward dropping borderline content
-    rather than keeping it — appropriate for news where a few extra
-    "related stories" links would muddy downstream summarization.
+    Two-pass extraction (precision → recall); if both produce <
+    _TRAFILATURA_MIN_OUTPUT chars, falls back to markitdown. The
+    fallback returns whole-page transcription with chrome — preferable
+    to silently caching the byline / author-bio fragment some
+    publishers' templates make trafilatura latch onto.
     """
     import trafilatura
 
@@ -128,45 +186,43 @@ def _trafilatura_from_url(url: str) -> tuple[str, dict]:
             f"trafilatura could not fetch {url} (blocked, paywalled, or non-HTML);"
             " retry with fetcher='stealth' to route through FlareSolverr"
         )
-    text = trafilatura.extract(
-        downloaded,
-        output_format="markdown",
-        include_comments=False,
-        include_tables=True,
-        favor_precision=True,
-        with_metadata=False,
-    )
-    if not text:
+    text = _trafilatura_extract_text(downloaded)
+    if text:
+        return text, _trafilatura_extract_metadata(downloaded)
+
+    # Neither precision nor recall produced enough content — the
+    # publisher's template is throwing off the scoring. Fall back to
+    # markitdown's whole-page transcription so we have *something*
+    # cached. Mark engine_used="markitdown" so callers know.
+    fallback = _markitdown_from_url(url)
+    if not fallback:
         raise RuntimeError(
-            f"trafilatura fetched {url} but extracted no article content"
-            " (page may be a navigation index, a JS-rendered SPA, or paywalled)"
+            f"both trafilatura passes and markitdown fallback came up empty for {url}"
         )
-    return str(text), _trafilatura_extract_metadata(downloaded)
+    return fallback, {**_trafilatura_extract_metadata(downloaded), "fallback": "markitdown"}
 
 
 def _trafilatura_from_html_bytes(content: bytes) -> tuple[str, dict]:
     """
     Extract article body from already-fetched HTML bytes. Used by the
     stealth path so FlareSolverr does the fetch and trafilatura does
-    the extraction.
+    the extraction. Same two-pass + markitdown-fallback policy as
+    `_trafilatura_from_url`.
     """
-    import trafilatura
-
     html_str = content.decode("utf-8", errors="replace")
-    text = trafilatura.extract(
-        html_str,
-        output_format="markdown",
-        include_comments=False,
-        include_tables=True,
-        favor_precision=True,
-        with_metadata=False,
-    )
-    if not text:
+    text = _trafilatura_extract_text(html_str)
+    if text:
+        return text, {**_trafilatura_extract_metadata(html_str), "fallback": None}
+
+    # Stealth fallback: feed the rendered HTML bytes to markitdown
+    # (it handles raw HTML well — much cleaner than its URL fetcher
+    # would have done, since FlareSolverr already executed JS).
+    fallback = _markitdown_from_bytes(content, "page.html")
+    if not fallback:
         raise RuntimeError(
-            "trafilatura extracted no article content from the fetched HTML"
-            " (page may be a navigation index, a JS-rendered SPA after stealth render, or paywalled)"
+            "both trafilatura passes and markitdown fallback came up empty on the stealth-fetched HTML"
         )
-    return str(text), _trafilatura_extract_metadata(html_str)
+    return fallback, {**_trafilatura_extract_metadata(html_str), "fallback": "markitdown"}
 
 
 # --- docling -----------------------------------------------------------------
