@@ -5,17 +5,17 @@ import { defineTool } from '../../lib/tool'
 export const convertUrlTool = defineTool({
   name: 'convert_url',
   description:
-    'Fetch a URL (webpage, YouTube, audio file, direct PDF link, etc.) and convert its content to LLM-efficient Markdown. Defaults to markitdown which handles web pages, YouTube transcripts, and audio URLs natively; pass engine="docling" when the URL points at a structured document you want parsed with layout preservation. When a site returns a Cloudflare / WAF challenge instead of content, set fetcher="stealth" to route through the bundled FlareSolverr proxy (requires `docker compose --profile stealth up`). See docs/tools/convert-url.md.',
+    'Fetch a URL and convert its content to LLM-efficient Markdown. `auto` defaults to trafilatura which extracts ONLY the article body (drops nav, ads, footer, sidebars) — best for news / blog pages. Pass engine="markitdown" for whole-page transcription (YouTube transcripts, audio URLs, arbitrary HTML). Pass engine="docling" for structured PDFs where table/heading fidelity matters. When a site returns a Cloudflare / WAF challenge, set fetcher="stealth" to route through the bundled FlareSolverr proxy (requires `docker compose --profile stealth up`); trafilatura still does the extraction on stealth-fetched HTML. See docs/tools/convert-url.md.',
   category: 'convert',
   http: { method: 'post', path: '/convert/url' },
   input: z
     .object({
       url: z.string().url().describe('Absolute URL to fetch.'),
       engine: z
-        .enum(['auto', 'markitdown', 'docling'])
+        .enum(['auto', 'markitdown', 'docling', 'trafilatura'])
         .default('auto')
         .describe(
-          'For URLs, `auto` resolves to markitdown (broad coverage). Pass `docling` for structured PDF URLs where table/heading fidelity matters.',
+          'For URLs, `auto` resolves to trafilatura (article-body extraction). Pass `markitdown` for whole-page transcription (YouTube/audio), `docling` for structured PDFs.',
         ),
       format: z.enum(['markdown', 'json', 'html']).default('markdown'),
       fetcher: z
@@ -29,11 +29,23 @@ export const convertUrlTool = defineTool({
   output: z
     .object({
       markdown: z.string(),
-      engine_used: z.enum(['markitdown', 'docling']),
+      engine_used: z.enum(['markitdown', 'docling', 'trafilatura']),
       fetcher_used: z.enum(['direct', 'stealth']).optional(),
       format: z.enum(['markdown', 'json', 'html']),
       source: z.object({ url: z.string() }),
       duration_ms: z.number().int(),
+      metadata: z
+        .object({
+          title: z.string().nullable().optional(),
+          author: z.string().nullable().optional(),
+          date: z.string().nullable().optional(),
+          sitename: z.string().nullable().optional(),
+          categories: z.array(z.string()).nullable().optional(),
+          tags: z.array(z.string()).nullable().optional(),
+        })
+        .partial()
+        .optional()
+        .describe('Structured metadata from trafilatura when extracted. Empty for other engines.'),
     })
     .openapi('ConvertUrlOutput'),
   execute: async (input) => pyJson('/convert/url', input, { timeoutMs: 120_000 }),
