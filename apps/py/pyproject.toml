@@ -18,6 +18,13 @@ dependencies = [
 convert = [
   "markitdown[all]==0.1.5",
   "docling>=2.14",
+  # Article-body extractor used as the default URL engine. markitdown
+  # transcribes the whole HTML page (nav, footer, sidebars, ads) —
+  # fine for arbitrary documents but useless for "read this news
+  # article cleanly." Trafilatura runs precision-focused heuristics +
+  # an ML classifier against the DOM and returns just the body as
+  # markdown, with structured metadata (title, author, date).
+  "trafilatura>=1.12",
 ]
 chunk = [
   "sentence-transformers>=3.3",
