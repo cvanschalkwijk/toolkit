@@ -84,6 +84,15 @@ class ConvertUrlRequest(BaseModel):
             "challenges and hand the engine the post-challenge HTML."
         ),
     )
+    include_body_html: bool = Field(
+        False,
+        description=(
+            "When true, the response includes a `body_html` field carrying "
+            "the inner-HTML of the page's <body> tag. Lets downstream "
+            "consumers re-process with a different extractor or LLM without "
+            "re-fetching. Off by default to keep responses small."
+        ),
+    )
 
 
 @app.post("/convert/file")
@@ -116,7 +125,12 @@ async def convert_url(body: ConvertUrlRequest) -> dict:
 
     try:
         return await asyncio.to_thread(
-            engines.convert_url, body.url, body.engine, body.format, body.fetcher
+            engines.convert_url,
+            body.url,
+            body.engine,
+            body.format,
+            body.fetcher,
+            body.include_body_html,
         )
     except Exception as e:  # noqa: BLE001
         raise map_exception(e) from e
