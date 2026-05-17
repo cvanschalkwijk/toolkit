@@ -33,6 +33,7 @@ describe('convertUrlTool', () => {
       engine: 'markitdown',
       format: 'markdown',
       fetcher: 'direct',
+      include_body_html: false,
     })
     expect(out.markdown).toBe('Hello World')
     expect(captured.url).toBe('http://sidecar.test:8000/convert/url')
@@ -41,6 +42,7 @@ describe('convertUrlTool', () => {
       engine: 'markitdown',
       format: 'markdown',
       fetcher: 'direct',
+      include_body_html: false,
     })
   })
 
@@ -66,6 +68,7 @@ describe('convertUrlTool', () => {
       engine: 'markitdown',
       format: 'markdown',
       fetcher: 'stealth',
+      include_body_html: false,
     })
     expect(out.fetcher_used).toBe('stealth')
     expect(JSON.parse(body as string).fetcher).toBe('stealth')
