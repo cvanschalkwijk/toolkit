@@ -28,7 +28,7 @@ export const convertUrlTool = defineTool({
         .boolean()
         .default(false)
         .describe(
-          'When true, the response includes a `body_html` field carrying the inner-HTML of the page\'s <body> tag. Lets downstream consumers re-process with a different extractor or LLM without re-fetching. Off by default to keep responses small — body HTML can run 50-200 KB.',
+          "When true, the response includes a `body_html` field carrying the inner-HTML of the page's <body> tag. Lets downstream consumers re-process with a different extractor or LLM without re-fetching. Off by default to keep responses small — body HTML can run 50-200 KB.",
         ),
     })
     .openapi('ConvertUrlInput'),
