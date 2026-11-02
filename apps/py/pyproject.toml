@@ -46,7 +46,11 @@ sanitize = [
 ]
 extract = [
   "instructor>=1.7",
-  "openai>=1.58",
+  # openai 3.0 moved its HTTP transport from httpx to httpx2, which broke the
+  # respx-based mock in test_extract silently on a fresh install. The test now
+  # injects an httpx2 MockTransport, so bound to the major whose transport it
+  # mocks; a 4.x transport change should fail resolution, not the test.
+  "openai>=3.0,<4",
 ]
 all = [
   "toolkit-py[convert,chunk,sanitize,extract]",
