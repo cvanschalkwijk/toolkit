@@ -2,8 +2,9 @@
 Structured extraction tests.
 
 Schema → Pydantic conversion is exercised without any LLM calls.
-The end-to-end instructor flow is mocked via `respx` so no real LLM
-endpoint is required to run CI.
+The end-to-end instructor flow runs against an httpx2 `MockTransport`
+injected into the OpenAI client, so no real LLM endpoint is required to
+run CI.
 """
 
 from __future__ import annotations
@@ -120,12 +121,16 @@ def test_run_extracts_against_mocked_llm(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
-    Full end-to-end with a mocked OpenAI-compat endpoint via respx.
+    Full end-to-end with a mocked OpenAI-compat endpoint.
     Verifies the schema→model pipeline produces valid structured output.
+
+    The mock sits at the transport of the HTTP library openai itself uses
+    (httpx2 since openai 3.0; see the bound in pyproject.toml). Patching
+    plain httpx (respx) intercepts nothing, and the call goes out for real.
     """
     pytest.importorskip("instructor")
-    pytest.importorskip("openai")
-    respx = pytest.importorskip("respx")
+    openai = pytest.importorskip("openai")
+    httpx2 = pytest.importorskip("httpx2")
 
     monkeypatch.setenv("LLM_BASE_URL", "http://mock/v1")
     monkeypatch.setenv("LLM_API_KEY", "test")
@@ -178,15 +183,31 @@ def test_run_extracts_against_mocked_llm(
         "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
     }
 
-    with respx.mock(base_url="http://mock/v1") as mock:
-        mock.post("/chat/completions").respond(200, json=mock_response)
-        result = instructor_runner.run(
-            {
-                "text": "Ada Lovelace was a mathematician born in 1815.",
-                "schema": schema,
-            }
-        )
+    requests: list = []
 
+    def handler(request):
+        requests.append(request)
+        return httpx2.Response(200, json=mock_response)
+
+    real_openai = openai.OpenAI
+
+    class MockedOpenAI(real_openai):
+        def __init__(self, **kwargs):
+            transport = httpx2.MockTransport(handler)
+            super().__init__(http_client=httpx2.Client(transport=transport), **kwargs)
+
+    monkeypatch.setattr(openai, "OpenAI", MockedOpenAI)
+
+    result = instructor_runner.run(
+        {
+            "text": "Ada Lovelace was a mathematician born in 1815.",
+            "schema": schema,
+        }
+    )
+
+    assert [(r.method, str(r.url)) for r in requests] == [
+        ("POST", "http://mock/v1/chat/completions")
+    ]
     assert result["data"] == {
         "name": "Ada Lovelace",
         "occupation": "mathematician",
