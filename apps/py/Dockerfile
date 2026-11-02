@@ -9,6 +9,9 @@
 #                  image with only the categories you need. Missing
 #                  categories return HTTP 501 at runtime with a clear
 #                  "install extras" message.
+#   TORCH_VERSION / TORCHVISION_VERSION
+#                  CPU-only torch pins installed before the extras (the image
+#                  runs without a GPU). Bump together; they must pair.
 #   SPACY_MODEL    spaCy model name for the sanitize category. Default
 #                  `en_core_web_lg` — the model Presidio's NER recognizers
 #                  expect. Set to empty to skip the download.
@@ -68,13 +71,18 @@ RUN mkdir -p src/toolkit_py && \
 # install then sees the requirement already satisfied and leaves them alone.
 # Versions match what the CUDA image resolved; torchvision must pair with torch.
 # Skipped when no extra needs torch (e.g. BUILD_EXTRAS=extract).
-RUN case ",${BUILD_EXTRAS}," in \
+RUN case ",$(printf %s "${BUILD_EXTRAS}" | tr -d ' ')," in \
       *,all,*|*,convert,*|*,chunk,*) \
         pip install --index-url https://download.pytorch.org/whl/cpu \
           "torch==${TORCH_VERSION}" "torchvision==${TORCHVISION_VERSION}" ;; \
     esac
 
 RUN pip install ".[${BUILD_EXTRAS}]"
+
+# Fail the build if anything swapped the CPU torch for the CUDA wheels.
+RUN python -c "import importlib.util as u, sys; \
+v = __import__('torch').__version__ if u.find_spec('torch') else '+cpu'; \
+sys.exit(0 if '+cpu' in v else 'CUDA torch installed: ' + v)"
 
 # spaCy model download (only if requested) — large (~500 MB for en_core_web_lg).
 # Conditional so slim builds (e.g., BUILD_EXTRAS=convert) don't pay the cost.
