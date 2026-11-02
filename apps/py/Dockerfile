@@ -51,6 +51,8 @@ RUN apt-get update \
 FROM base AS deps
 ARG BUILD_EXTRAS
 ARG SPACY_MODEL
+ARG TORCH_VERSION=2.12.0
+ARG TORCHVISION_VERSION=0.27.0
 WORKDIR /app
 
 # Copy the manifest first so this layer only invalidates when deps change.
@@ -59,6 +61,18 @@ COPY apps/py/pyproject.toml ./
 # metadata without the actual source yet (keeps layer caching tight).
 RUN mkdir -p src/toolkit_py && \
     echo '__version__ = "0.1.0"' > src/toolkit_py/__init__.py
+
+# torch (and torchvision, pulled in by docling) resolve to the CUDA wheels on
+# PyPI, which add ~4.5 GB of nvidia/ + triton/ that a GPU-less container never
+# uses. Install the CPU builds first from the PyTorch CPU index; the extras
+# install then sees the requirement already satisfied and leaves them alone.
+# Versions match what the CUDA image resolved; torchvision must pair with torch.
+# Skipped when no extra needs torch (e.g. BUILD_EXTRAS=extract).
+RUN case ",${BUILD_EXTRAS}," in \
+      *,all,*|*,convert,*|*,chunk,*) \
+        pip install --index-url https://download.pytorch.org/whl/cpu \
+          "torch==${TORCH_VERSION}" "torchvision==${TORCHVISION_VERSION}" ;; \
+    esac
 
 RUN pip install ".[${BUILD_EXTRAS}]"
 
